@@ -1,4 +1,4 @@
-import { Card, EmptyState, Notice, PageHeader, Stat, StatGrid, StatusBadge, TableWrap } from '@/components/ui';
+import { Card, EmptyState, MoreSection, Notice, PageHeader, Stat, StatGrid, StatusBadge, TableWrap } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
 import { CAPITAL_DEFINITIONS, formatCOP, formatDate, formatDateTime } from '@/lib/finance';
 import { WORKFLOW_STATUS } from '@/lib/labels';
@@ -29,16 +29,20 @@ export default async function PartnerHome() {
   return (
     <>
       <PageHeader title={d.partner.name} subtitle={`Participación ${d.partner.share_bps / 100} % · solo lectura`} />
-      <StatGrid>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Mi capital aportado" value={formatCOP(d.my_capital)} definition="Aportes menos retiros de capital registrados a su nombre." />
         <Stat label="Mis ganancias distribuidas" value={formatCOP(d.my_profit_distributed)} hint={`Pagado: ${formatCOP(d.my_profit_paid)}`} definition="Participación aprobada en liquidaciones trimestrales." />
         <Stat label="Estimado por liquidar" value={formatCOP(d.my_unsettled_estimate)} definition="Su participación sobre los intereses ya cobrados (netos de comisiones y gastos) desde la última liquidación. No es definitiva hasta aprobarse." />
+      </div>
+      <MoreSection className="mt-3">
+      <StatGrid>
         <Stat label="Anticipos pendientes" value={formatCOP(d.my_advances)} definition="Anticipos recibidos que se descontarán de su próxima distribución." />
         <Stat label="Préstamos activos" value={d.loans.active} hint={formatCOP(d.loans.active_principal)} />
         <Stat label="Capital recuperado (total)" value={formatCOP(d.principal_recovered_total)} definition="Capital devuelto por los clientes. Vuelve a estar disponible para prestar; no es ganancia." />
         <Stat label="Intereses recaudados (total)" value={formatCOP(d.interest_collected_total)} />
         <Stat label="Capital disponible" value={formatCOP(d.capital.available)} definition={CAPITAL_DEFINITIONS.available} />
       </StatGrid>
+      </MoreSection>
 
       {d.partners && (
         <Card title="Capital por socio" className="mt-5">

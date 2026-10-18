@@ -74,3 +74,16 @@ export function rangeFor(period: string | undefined, today: string, from?: strin
   if (period === 'custom' && from && to && isIsoDate(from) && isIsoDate(to) && from <= to) return { from, to };
   return { from: today, to: today };
 }
+
+export type DueTone = 'success' | 'info' | 'warning' | 'danger' | 'neutral';
+
+/** Texto corto del estado de una cuota según los días hasta (o desde) su vencimiento. */
+export function dueStatus(dueDate: string | null | undefined, today: string, paid = false): { text: string; tone: DueTone; days: number } {
+  if (paid) return { text: 'Pagada', tone: 'success', days: 0 };
+  if (!dueDate) return { text: 'Sin cuotas pendientes', tone: 'neutral', days: 0 };
+  const days = daysBetween(today, dueDate.slice(0, 10));
+  if (days === 0) return { text: 'Vence hoy', tone: 'warning', days };
+  if (days > 0) return { text: days === 1 ? 'Falta 1 día' : `Faltan ${days} días`, tone: days <= 2 ? 'warning' : 'info', days };
+  const late = -days;
+  return { text: late === 1 ? 'Atrasada 1 día' : `Atrasada ${late} días`, tone: 'danger', days };
+}

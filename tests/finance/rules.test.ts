@@ -233,3 +233,15 @@ describe('Capital y liquidación', () => {
     expect(DEFAULT_POLICY.collectorCommissionBps + DEFAULT_POLICY.partnersBps).toBe(DEFAULT_POLICY.interestBps);
   });
 });
+
+describe('Días para pagar / atraso', () => {
+  it('muestra cuántos días faltan o de atraso', async () => {
+    const { dueStatus } = await import('@/lib/finance');
+    expect(dueStatus('2026-10-19', '2026-10-18').text).toBe('Falta 1 día');
+    expect(dueStatus('2026-10-25', '2026-10-18').text).toBe('Faltan 7 días');
+    expect(dueStatus('2026-10-18', '2026-10-18').text).toBe('Vence hoy');
+    expect(dueStatus('2026-10-17', '2026-10-18')).toMatchObject({ text: 'Atrasada 1 día', tone: 'danger' });
+    expect(dueStatus('2026-10-14', '2026-10-18').text).toBe('Atrasada 4 días');
+    expect(dueStatus('2026-10-14', '2026-10-18', true).text).toBe('Pagada');
+  });
+});

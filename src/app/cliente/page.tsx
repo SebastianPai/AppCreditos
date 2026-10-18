@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { Card, EmptyState, Notice, PageHeader, Stat, StatGrid, StatusBadge } from '@/components/ui';
+import { Badge, Card, EmptyState, MoreSection, Notice, PageHeader, Stat, StatusBadge } from '@/components/ui';
 import { requireRole } from '@/lib/auth';
-import { formatCOP, formatDate } from '@/lib/finance';
+import { dueStatus, formatCOP, formatDate, todayBogota } from '@/lib/finance';
 import { APPLICATION_STATUS, LOAN_STATUS, PAYMENT_METHOD } from '@/lib/labels';
 import { userDb } from '@/lib/auth';
 
@@ -35,12 +35,11 @@ export default async function CustomerHome() {
       )}
 
       {customer && (
-        <StatGrid>
+        <div className="grid grid-cols-2 gap-3">
           <Stat label="Saldo pendiente" value={formatCOP(customer.outstanding)} />
-          <Stat label="Próximo vencimiento" value={customer.next_due_date ? formatDate(customer.next_due_date) : '—'} />
-          <Stat label="Préstamos activos" value={customer.active_loans} />
-          <Stat label="Solicitudes en trámite" value={apps?.length ?? 0} />
-        </StatGrid>
+          <Stat label="Próxima cuota" value={customer.next_due_date ? formatDate(customer.next_due_date) : '—'}
+            hint={customer.next_due_date ? <Badge tone={dueStatus(customer.next_due_date, todayBogota()).tone}>{dueStatus(customer.next_due_date, todayBogota()).text}</Badge> : undefined} />
+        </div>
       )}
 
       {apps && apps.length > 0 && (
@@ -69,7 +68,7 @@ export default async function CustomerHome() {
                       <p className="font-medium">{l.code} · {formatCOP(l.principal)}</p>
                       <p className="text-xs text-slate-500">
                         Pagado {formatCOP(l.paid_total)} de {formatCOP(l.total_amount)}
-                        {l.next_due_date && ` · vence ${formatDate(l.next_due_date)}`}
+                        {l.status === 'active' && l.next_due_date && ` · ${dueStatus(l.next_due_date, todayBogota()).text.toLowerCase()}`}
                       </p>
                     </div>
                     <div className="text-right">
@@ -82,7 +81,8 @@ export default async function CustomerHome() {
             </ul>
           )}
         </Card>
-        <Card title="Últimos pagos">
+        <MoreSection label="Ver últimos pagos">
+        <Card>
           {!payments?.length ? (
             <EmptyState>Aún no hay pagos registrados.</EmptyState>
           ) : (
@@ -101,6 +101,7 @@ export default async function CustomerHome() {
             </ul>
           )}
         </Card>
+        </MoreSection>
       </div>
     </>
   );

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { DailyCollectionsChart, MonthlyChart } from '@/components/charts';
-import { Card, Notice, PageHeader, Stat, StatGrid, StatusBadge } from '@/components/ui';
+import { Card, MoreSection, Notice, PageHeader, Stat, StatGrid, StatusBadge } from '@/components/ui';
 import { CAPITAL_DEFINITIONS, formatCOP, formatDate, formatDateTime, FREQUENCY_LABEL, type Frequency } from '@/lib/finance';
 import { WORKFLOW_STATUS } from '@/lib/labels';
 import { userDb } from '@/lib/auth';
@@ -79,7 +79,15 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
         <Link href="/admin/prestamos?estado=approved" className="btn-secondary btn-sm">Por desembolsar: <strong>{d.portfolio.approved_pending_disbursement}</strong></Link>
       </div>
 
-      <h2 className="mb-2 text-sm font-semibold tracking-wide text-slate-500 uppercase">Capital</h2>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label="Capital disponible" value={formatCOP(c.available)} tone={c.available < 0 ? 'danger' : 'success'} definition={CAPITAL_DEFINITIONS.available} />
+        <Stat label="Cartera pendiente" value={formatCOP(d.portfolio.outstanding)} hint={`${d.portfolio.active_loans} préstamos`} definition="Capital + interés aún no pagado de préstamos activos." />
+        <Stat label="Cartera vencida" value={formatCOP(d.portfolio.overdue)} tone={d.portfolio.overdue ? 'danger' : undefined} definition="Saldo de cuotas con vencimiento anterior a hoy." />
+        <Stat label="Cobrado hoy" value={formatCOP(d.today_collections.amount)} hint={`${d.today_collections.count} pagos`} />
+      </div>
+
+      <div className="mt-4 space-y-3">
+        <MoreSection label="Ver capital y resultados del mes">
       <StatGrid>
         <Stat label="Capital total aportado" value={formatCOP(c.partner_capital)} definition={CAPITAL_DEFINITIONS.partner_capital} />
         <Stat label="Capital disponible" value={formatCOP(c.available)} tone={c.available < 0 ? 'danger' : 'success'} definition={CAPITAL_DEFINITIONS.available} />
@@ -91,7 +99,6 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
         <Stat label="Utilidades por pagar" value={formatCOP(c.partner_profit_payable)} definition={CAPITAL_DEFINITIONS.partner_profit_payable} />
       </StatGrid>
 
-      <h2 className="mt-6 mb-2 text-sm font-semibold tracking-wide text-slate-500 uppercase">Este mes y cartera</h2>
       <StatGrid>
         <Stat label="Desembolsado este mes" value={formatCOP(d.month.disbursed)} definition="Capital de préstamos desembolsados en el mes calendario actual." />
         <Stat label="Capital recuperado este mes" value={formatCOP(d.month.principal_recovered)} definition="Parte de capital de los pagos confirmados del mes. No es ganancia." />
@@ -103,12 +110,16 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
         <Stat label="Comisiones por pagar" value={formatCOP(d.commissions.pending_payment)} hint={`Devengado total ${formatCOP(d.commissions.accrued_total)}`} definition={CAPITAL_DEFINITIONS.commission_payable} />
       </StatGrid>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        </MoreSection>
+        <MoreSection label="Ver gráficos">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Recaudo diario (30 días)"><DailyCollectionsChart data={d.series_daily} /></Card>
         <Card title="Mensual (12 meses)"><MonthlyChart data={d.series_monthly} /></Card>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        </MoreSection>
+        <MoreSection label="Ver socios, liquidación y simulaciones">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Ganancias de los socios" className="lg:col-span-2">
           <div className="-mx-4 overflow-x-auto px-4">
             <table className="table">
@@ -130,8 +141,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
             </table>
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            Calculada: participación sobre la bolsa contractual (15 %) de préstamos desembolsados. Recaudada sin liquidar: participación sobre intereses ya
-            cobrados, netos de comisiones y gastos. Distribuida: aprobada en liquidaciones. Pagada: entregada al socio.
+            Calculada: sobre la bolsa del 15 %. Recaudada: sobre intereses ya cobrados. Distribuida: aprobada en liquidación.
           </p>
         </Card>
         <Card title="Próxima liquidación">
@@ -141,7 +151,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
         </Card>
       </div>
 
-      <Card title={`Simulaciones recientes (${d.simulations_7d} en 7 días)`} className="mt-4">
+      <Card title={`Simulaciones recientes (${d.simulations_7d} en 7 días)`}>
         <ul className="divide-y divide-slate-100 text-sm">
           {sims?.map((s) => (
             <li key={s.id} className="flex justify-between py-2">
@@ -153,6 +163,8 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
           ))}
         </ul>
       </Card>
+        </MoreSection>
+      </div>
     </>
   );
 }

@@ -1,6 +1,5 @@
-import { formatCOP, formatDate } from '@/lib/finance';
-import { INSTALLMENT_STATUS } from '@/lib/labels';
-import { StatusBadge, TableWrap } from './ui';
+import { dueStatus, formatCOP, formatDate, todayBogota } from '@/lib/finance';
+import { Badge, TableWrap } from './ui';
 
 export interface InstallmentRow {
   id: string;
@@ -18,6 +17,7 @@ export interface InstallmentRow {
 /** Tabla de amortización con estado y saldo de cada cuota. */
 export function InstallmentsTable({ rows, showSplit = true }: { rows: InstallmentRow[]; showSplit?: boolean }) {
   let balance = rows.reduce((s, r) => s + Number(r.total_amount), 0);
+  const today = todayBogota();
   return (
     <TableWrap>
       <table className="table">
@@ -48,7 +48,11 @@ export function InstallmentsTable({ rows, showSplit = true }: { rows: Installmen
                 <td className="num">{formatCOP(r.outstanding)}</td>
                 <td className="num">{formatCOP(balance)}</td>
                 <td>
-                  <StatusBadge map={INSTALLMENT_STATUS} value={r.effective_status} />
+                  {(() => {
+                    const st = dueStatus(r.due_date, today, Number(r.outstanding) === 0);
+                    return r.effective_status === 'in_review' ? <Badge tone="warning">En revisión</Badge> : <Badge tone={st.tone}>{st.text}</Badge>;
+                  })()}
+                  {Number(r.paid_total) > 0 && Number(r.outstanding) > 0 && <p className="mt-1 text-xs text-sky-700">Abono parcial</p>}
                   {r.review_note && <p className="mt-1 text-xs text-amber-800">{r.review_note}</p>}
                 </td>
               </tr>

@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { Card, EmptyState, PageHeader } from '@/components/ui';
-import { formatCOP, formatDate } from '@/lib/finance';
+import { Badge, Card, EmptyState, PageHeader } from '@/components/ui';
+import { dueStatus, formatCOP, todayBogota } from '@/lib/finance';
 import { userDb } from '@/lib/auth';
 
 export const metadata = { title: 'Mis clientes' };
@@ -27,7 +27,8 @@ export default async function CollectorCustomersPage({ searchParams }: { searchP
                 <Link href={`/cobrador/clientes/${c.id}`} className="flex items-center justify-between gap-3 py-3">
                   <div>
                     <p className="font-medium">{c.full_name}</p>
-                    <p className="text-xs text-slate-500">{c.code} · {c.phone}{c.next_due_date && ` · vence ${formatDate(c.next_due_date)}`}</p>
+                    <p className="text-xs text-slate-500">{c.code} · {c.phone}</p>
+                    {c.next_due_date && (() => { const st = dueStatus(c.next_due_date, todayBogota()); return <div className="mt-1"><Badge tone={st.tone}>{st.text}</Badge></div>; })()}
                   </div>
                   <span className="font-semibold tabular-nums">{formatCOP(c.outstanding)}</span>
                 </Link>

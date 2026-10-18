@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { Card, EmptyState, LinkButton, PageHeader, StatusBadge, TableWrap } from '@/components/ui';
-import { formatCOP, formatDate, FREQUENCY_LABEL, isIsoDate, type Frequency } from '@/lib/finance';
+import { Badge, Card, EmptyState, LinkButton, PageHeader, StatusBadge, TableWrap } from '@/components/ui';
+import { dueStatus, formatCOP, formatDate, FREQUENCY_LABEL, isIsoDate, todayBogota, type Frequency } from '@/lib/finance';
 import { LOAN_STATUS } from '@/lib/labels';
 import { userDb } from '@/lib/auth';
 import { uuidOrNull } from '@/lib/validation';
@@ -78,7 +78,10 @@ export default async function LoansPage({ searchParams }: { searchParams: Promis
                     <td>{l.installments_paid}/{l.installments_count} · {FREQUENCY_LABEL[l.frequency as Frequency]}</td>
                     <td className="num">{formatCOP(l.outstanding)}</td>
                     <td className={`num ${l.overdue_amount ? 'text-red-700' : ''}`}>{formatCOP(l.overdue_amount)}</td>
-                    <td className="whitespace-nowrap">{formatDate(l.next_due_date)}</td>
+                    <td className="whitespace-nowrap">
+                      {formatDate(l.next_due_date)}
+                      {l.status === 'active' && l.next_due_date && (() => { const st = dueStatus(l.next_due_date, todayBogota()); return <div><Badge tone={st.tone}>{st.text}</Badge></div>; })()}
+                    </td>
                     <td><StatusBadge map={LOAN_STATUS} value={l.status} /></td>
                   </tr>
                 ))}
