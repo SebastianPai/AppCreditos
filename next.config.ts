@@ -3,7 +3,8 @@ import type { NextConfig } from 'next';
 const csp = [
   "default-src 'self'",
   // Next.js inyecta scripts en línea para la hidratación. Para una CSP estricta con nonce, ver docs/SEGURIDAD.md.
-  "script-src 'self' 'unsafe-inline'",
+  // React usa eval() solo en desarrollo; en producción no se permite.
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "connect-src 'self'",
@@ -17,6 +18,7 @@ const csp = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  allowedDevOrigins: ['127.0.0.1'],
   reactStrictMode: true,
   serverExternalPackages: ['exceljs', 'web-push', 'pg'],
   experimental: {

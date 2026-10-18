@@ -71,7 +71,7 @@ export async function assignCollector(_: ActionResult, fd: FormData): Result {
 
 // ---------------------------------------------------------------- Usuarios
 const createUserSchema = z.object({
-  email: z.string().email('Correo no válido'),
+  email: z.string().email('Correo no válido').optional().or(z.literal('')),
   full_name: z.string().trim().min(2, 'Nombre requerido').max(160),
   role: z.enum(['admin', 'collector', 'partner', 'customer']),
   phone: z.string().trim().regex(/^[0-9+ ]{7,20}$/, 'Teléfono no válido').optional().or(z.literal('')),
@@ -93,10 +93,11 @@ export async function createUser(_: ActionResult, fd: FormData): Result {
   });
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
   const { email, full_name, role, phone, customer_id } = parsed.data;
+  if (!email && role !== 'customer') return { ok: false, error: 'El correo es obligatorio para el personal.' };
   const password = temporaryPassword();
   const db = await userDb();
   const { error } = await db.call('admin_create_user', {
-    p_email: email,
+    p_email: email || null,
     p_password_hash: await hashPassword(password),
     p_full_name: full_name,
     p_phone: phone || null,
@@ -105,7 +106,8 @@ export async function createUser(_: ActionResult, fd: FormData): Result {
   });
   if (error) return { ok: false, error: friendlyError(error) };
   revalidatePath('/admin', 'layout');
-  return { ok: true, message: `Cuenta creada. Usuario: ${email} · Contraseña temporal: ${password} (cópiela ahora; se pedirá cambiarla al ingresar).` };
+  const login = email || 'la cédula del cliente';
+  return { ok: true, message: `Cuenta creada. Usuario: ${login} · Contraseña temporal: ${password} (cópiela ahora; se pedirá cambiarla al ingresar).` };
 }
 
 export async function resetUserPassword(_: ActionResult, fd: FormData): Result {
@@ -338,6 +340,13 @@ export async function saveCompliance(_: ActionResult, fd: FormData): Result {
       usury_rate_valid_until: formOptional(fd, 'usury_rate_valid_until'),
     },
   }, 'Configuración de cumplimiento guardada (auditada).');
+}
+
+export async function saveOperations(_: ActionResult, fd: FormData): Result {
+  return rpc('update_setting', {
+    p_key: 'operations',
+    p_value: { collectors_can_create_customers: fd.get('collectors_can_create_customers') === 'on' },
+  }, 'Ajuste guardado (auditado).');
 }
 
 export async function saveCompany(_: ActionResult, fd: FormData): Result {

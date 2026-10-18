@@ -17,8 +17,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <ActionForm action={signIn} submitLabel="Entrar">
           <input type="hidden" name="next" value={next ?? ''} />
           <div>
-            <label className="label" htmlFor="email">Correo electrónico</label>
-            <input id="email" name="email" type="email" autoComplete="username" required className="input" />
+            <label className="label" htmlFor="email">Correo o cédula</label>
+            <input id="email" name="email" type="text" autoComplete="username" autoCapitalize="none" required className="input" />
           </div>
           <div>
             <label className="label" htmlFor="password">Contraseña</label>

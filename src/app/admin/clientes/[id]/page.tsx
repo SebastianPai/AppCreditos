@@ -58,7 +58,8 @@ export default async function AdminCustomerPage({ params }: { params: Promise<{ 
                 <input type="hidden" name="customer_id" value={c.id} />
                 <input type="hidden" name="full_name" value={c.full_name} />
                 <input type="hidden" name="phone" value={c.phone} />
-                <input name="email" type="email" required placeholder="Correo del cliente" className="input" aria-label="Correo" />
+                <input name="email" type="email" placeholder="Correo (opcional)" className="input" aria-label="Correo" />
+                <p className="text-xs text-slate-500">Sin correo, el cliente ingresa con su cédula ({c.document_number}).</p>
               </ActionForm>
             </details>
           )}

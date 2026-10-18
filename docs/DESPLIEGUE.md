@@ -34,7 +34,7 @@ Contraseña para todos: `Demo2026!`
 | Administrador | admin@demo.co |
 | Cobrador | cobrador@demo.co · cobrador2@demo.co |
 | Socio | socio1@demo.co · socio2@demo.co |
-| Cliente | cliente@demo.co |
+| Cliente | cliente@demo.co (o su cédula 1012345678) |
 
 El seed activa el **modo demostración** (Configuración → Cumplimiento) y crea socios,
 aportes, clientes, préstamos con pagos, una solicitud pendiente y un gasto.

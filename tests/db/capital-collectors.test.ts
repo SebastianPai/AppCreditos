@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { capitalAvailable } from '@/lib/finance';
-import { TestDb, enableComplianceForTests, isoDaysFromToday, seedScenario, user } from './harness';
+import { TestDb, enableComplianceForTests, isoDaysFromToday, seedScenario, service, user } from './harness';
 
 let db: TestDb;
 let s: Awaited<ReturnType<typeof seedScenario>>;
@@ -111,5 +111,41 @@ describe('Comisiones del cobrador', () => {
     const dash = await db.rpc<Record<string, any>>(C1(), 'collector_dashboard');
     expect(n(dash.commission_accrued_total)).toBe(7_500);
     expect(n(dash.commission_pending)).toBe(0);
+  });
+});
+
+describe('Registro de clientes por cobradores', () => {
+  const newCustomer = (who: ReturnType<typeof user>, doc: string, collectorId: string | null = null) =>
+    db.rpc<string>(who, 'create_customer', {
+      p_full_name: 'Pedro Cliente', p_document_type: 'CC', p_document_number: doc, p_phone: '3009998877',
+      p_address: null, p_collector_id: collectorId, p_notes: null, p_data_consent: true,
+    });
+
+  it('el cobrador registra un cliente (cédula obligatoria) que queda asignado a él', async () => {
+    const id = await newCustomer(C1(), '55.444.333', s.collector2);
+    const row = (await db.owner<any>('select collector_id, document_number from public.customers where id = $1', [id]))[0];
+    expect(row).toEqual({ collector_id: s.collector, document_number: '55444333' });
+    await expect(newCustomer(C1(), '')).rejects.toThrow(/cédula es obligatoria/);
+    await expect(newCustomer(C1(), '55444333')).rejects.toThrow(/DUPLICATE_CUSTOMER/);
+  });
+
+  it('crea la cuenta del cliente sin correo y el cliente ingresa con su cédula', async () => {
+    const id = await newCustomer(C1(), '77888999');
+    const userId = await db.rpc<string>(C1(), 'admin_create_user', {
+      p_email: null, p_password_hash: 'x', p_full_name: 'Pedro Cliente', p_phone: null, p_role: 'customer', p_customer_id: id,
+    });
+    expect(await db.rpc(service, 'login_user_id', { p_identifier: '77.888.999' })).toBe(userId);
+    // Un cobrador no crea cuentas de otros roles ni de clientes ajenos.
+    await expect(db.rpc(C1(), 'admin_create_user', { p_email: 'x@y.co', p_password_hash: 'x', p_full_name: 'X', p_phone: null, p_role: 'collector', p_customer_id: null })).rejects.toThrow(/FORBIDDEN/);
+    await expect(db.rpc(C1(), 'admin_create_user', { p_email: null, p_password_hash: 'x', p_full_name: 'X', p_phone: null, p_role: 'customer', p_customer_id: s.customerB })).rejects.toThrow(/FORBIDDEN/);
+    await expect(db.rpc(C1(), 'login_user_id', { p_identifier: '77888999' })).rejects.toThrow(/FORBIDDEN/);
+  });
+
+  it('el administrador puede desactivar la opción (queda auditado)', async () => {
+    await db.rpc(A(), 'update_setting', { p_key: 'operations', p_value: { collectors_can_create_customers: false } });
+    await expect(newCustomer(C1(), '12121212')).rejects.toThrow(/desactivó/);
+    await expect(db.rpc(C1(), 'update_setting', { p_key: 'operations', p_value: { collectors_can_create_customers: true } })).rejects.toThrow(/FORBIDDEN/);
+    await db.rpc(A(), 'update_setting', { p_key: 'operations', p_value: { collectors_can_create_customers: true } });
+    expect(await newCustomer(C1(), '12121212')).toBeTruthy();
   });
 });

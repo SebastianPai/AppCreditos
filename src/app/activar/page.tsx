@@ -11,7 +11,10 @@ export default async function ActivatePage() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-6 py-10">
       <h1 className="text-2xl font-bold">Hola, {profile.full_name.split(' ')[0]}</h1>
-      <p className="mt-1 text-sm text-slate-600">Cree una contraseña para activar su cuenta ({profile.email}).</p>
+      <p className="mt-1 text-sm text-slate-600">
+        Cree una contraseña para activar su cuenta (
+        {profile.email.endsWith('@clientes.capital-control.local') ? `usuario: cédula ${profile.email.split('@')[0]}` : profile.email}).
+      </p>
       <div className="mt-6">
         <ActionForm action={setPassword} submitLabel="Guardar contraseña">
           <div>

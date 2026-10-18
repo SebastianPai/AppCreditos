@@ -6,7 +6,8 @@ import { ROLE_HOME, signIn as doSignIn } from '@/lib/auth';
 import type { ActionResult } from '@/lib/errors';
 import { formString } from '@/lib/validation';
 
-const credentials = z.object({ email: z.string().email('Correo no válido'), password: z.string().min(1).max(200) });
+// Correo (personal) o cédula (clientes).
+const credentials = z.object({ email: z.string().trim().min(3).max(200), password: z.string().min(1).max(200) });
 
 /** Evita redirecciones abiertas: solo rutas internas. */
 function safeNext(next: string): string | null {
@@ -15,7 +16,7 @@ function safeNext(next: string): string | null {
 
 export async function signIn(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const parsed = credentials.safeParse({ email: formString(fd, 'email'), password: fd.get('password') });
-  if (!parsed.success) return { ok: false, error: 'Correo o contraseña incorrectos.' };
+  if (!parsed.success) return { ok: false, error: 'Usuario o contraseña incorrectos.' };
   const result = await doSignIn(parsed.data.email, parsed.data.password, (await headers()).get('user-agent'));
   if (!result.ok) return { ok: false, error: result.error };
   if (result.mustChange) redirect('/activar');

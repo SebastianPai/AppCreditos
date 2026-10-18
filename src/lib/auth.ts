@@ -61,13 +61,14 @@ export type SignInResult = { ok: true; role: AppRole; mustChange: boolean } | { 
 
 export async function signIn(email: string, password: string, userAgent: string | null): Promise<SignInResult> {
   const sys = systemDb();
+  const userId = await sys.rpc<string | null>('login_user_id', { p_identifier: email });
   const user = await sys.one<{ id: string; password_hash: string; locked_until: string | null; must_change_password: boolean; role: AppRole; active: boolean }>(
     `select u.id, u.password_hash, u.locked_until, u.must_change_password, p.role, p.active
-       from auth.users u join public.profiles p on p.id = u.id where u.email = $1`,
-    [email.toLowerCase().trim()],
+       from auth.users u join public.profiles p on p.id = u.id where u.id = $1`,
+    [userId],
   );
   const valid = await verifyPassword(password, user?.password_hash ?? DUMMY_HASH);
-  const generic = 'Correo o contraseña incorrectos.';
+  const generic = 'Usuario o contraseña incorrectos.';
   if (!user) return { ok: false, error: generic };
   if (user.locked_until && new Date(user.locked_until) > new Date()) {
     return { ok: false, error: `Cuenta bloqueada temporalmente por intentos fallidos. Intente en ${LOCK_MINUTES} minutos.` };

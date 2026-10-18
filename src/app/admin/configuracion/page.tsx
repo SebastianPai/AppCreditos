@@ -3,7 +3,7 @@ import { Card, Notice, PageHeader, StatusBadge } from '@/components/ui';
 import { formatCOP, formatDateTime } from '@/lib/finance';
 import { userDb } from '@/lib/auth';
 import {
-  activatePolicy, createPaymentMethod, createPolicy, saveCompany, saveCompliance, savePaymentInstructions, togglePaymentMethod, upsertPartner,
+  activatePolicy, createPaymentMethod, createPolicy, saveCompany, saveCompliance, saveOperations, savePaymentInstructions, togglePaymentMethod, upsertPartner,
 } from '../actions';
 
 export const metadata = { title: 'Configuración' };
@@ -143,6 +143,15 @@ export default async function SettingsPage() {
             ))}
           </div>
           <p className="mt-2 text-xs text-slate-500">La bolsa de socios se reparte según la participación (inicialmente 50/50). Las participaciones activas deben sumar 100 %.</p>
+        </Card>
+
+        <Card title="Operación">
+          <ActionForm action={saveOperations} submitLabel="Guardar">
+            <label className="flex items-start gap-3 text-sm">
+              <input type="checkbox" name="collectors_can_create_customers" defaultChecked={get<{ collectors_can_create_customers?: boolean }>('operations')?.collectors_can_create_customers ?? true} className="mt-0.5 size-5" />
+              <span>Los cobradores pueden registrar clientes nuevos (con cédula obligatoria) y crearles acceso a la app.</span>
+            </label>
+          </ActionForm>
         </Card>
 
         <Card title="Empresa (comprobantes e informes)">

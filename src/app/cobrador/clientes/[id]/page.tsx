@@ -7,7 +7,7 @@ import { Card, KeyValue, PageHeader, StatusBadge } from '@/components/ui';
 import { formatCOP, formatDate, todayBogota, FREQUENCY_LABEL, type Frequency } from '@/lib/finance';
 import { LOAN_STATUS, PAYMENT_METHOD } from '@/lib/labels';
 import { userDb } from '@/lib/auth';
-import { registerPayment, requestReversal } from '../../actions';
+import { collectorCreateAccess, registerPayment, requestReversal } from '../../actions';
 
 export default async function CollectorCustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,17 +15,32 @@ export default async function CollectorCustomerPage({ params }: { params: Promis
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const customer = await db.one('select * from public.v_customers where id = $1', [id]);
   if (!customer) notFound();
-  const [loans, installments, payments] = await Promise.all([
+  const [loans, installments, payments, ops, doc] = await Promise.all([
     db.query(`select * from public.v_loan_balances where customer_id = $1 and status in ('active', 'paid') order by created_at desc`, [id]),
     db.query<any>('select * from public.v_installments where customer_id = $1 order by number', [id]),
     db.query('select id, loan_id, receipt_number, amount, method, received_on, status from public.payments where customer_id = $1 order by received_at desc limit 30', [id]),
+    db.one<{ value: { collectors_can_create_customers?: boolean } }>(`select value from public.app_settings where key = 'operations'`),
+    db.one<{ document_number: string }>('select document_number from public.customers where id = $1', [id]),
   ]);
+  const canCreateAccess = !customer.profile_id && (ops?.value.collectors_can_create_customers ?? false);
   const today = todayBogota();
 
   return (
     <>
       <Link href="/cobrador/clientes" className="mb-3 inline-block text-sm text-brand-700">← Mis clientes</Link>
       <PageHeader title={customer.full_name} subtitle={`${customer.code} · ${customer.document_type} ${customer.document_masked}`} actions={<a href={`tel:${customer.phone.replace(/\s/g, '')}`} className="btn-secondary">Llamar {customer.phone}</a>} />
+
+      {canCreateAccess && (
+        <Card className="mb-4">
+          <ActionForm action={collectorCreateAccess} submitLabel="Crear acceso a la app" variant="secondary">
+            <input type="hidden" name="customer_id" value={customer.id} />
+            <input type="hidden" name="full_name" value={customer.full_name} />
+            <input type="hidden" name="phone" value={customer.phone} />
+            <input type="hidden" name="document" value={doc?.document_number ?? ''} />
+            <p className="text-sm text-slate-600">El cliente aún no tiene acceso. Ingresará con su cédula y una contraseña temporal.</p>
+          </ActionForm>
+        </Card>
+      )}
 
       {(loans ?? []).map((l) => {
         const rows = (installments ?? []).filter((i) => i.loan_id === l.id);

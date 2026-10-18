@@ -3,7 +3,8 @@ import { revalidatePath } from 'next/cache';
 import { requireRole, userDb } from '@/lib/auth';
 import { friendlyError, type ActionResult } from '@/lib/errors';
 import { customerUserOfLoan, notifyUsers } from '@/lib/push';
-import { firstIssue, formOptional, formPesos, formString, paymentSchema } from '@/lib/validation';
+import { hashPassword, temporaryPassword } from '@/lib/password';
+import { customerSchema, firstIssue, formOptional, formPesos, formString, paymentSchema } from '@/lib/validation';
 
 export type PaymentResult = ActionResult<{ payment_id: string; receipt_number: number; duplicate: boolean; is_partial: boolean }>;
 
@@ -62,4 +63,65 @@ export async function declareHandover(_: ActionResult, fd: FormData): Promise<Ac
   if (error) return { ok: false, error: friendlyError(error) };
   revalidatePath('/cobrador/comisiones');
   return { ok: true, message: 'Entrega registrada. Queda pendiente hasta que la administración confirme que recibió el dinero.' };
+}
+
+/**
+ * Registro de cliente por el cobrador (si la administración lo permite). La cédula es obligatoria
+ * y el cliente queda asignado a quien lo registra. Opcionalmente crea su acceso a la app.
+ */
+export async function collectorCreateCustomer(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  await requireRole('collector');
+  const parsed = customerSchema.safeParse({
+    full_name: formString(fd, 'full_name'),
+    document_type: formString(fd, 'document_type'),
+    document_number: formString(fd, 'document_number'),
+    phone: formString(fd, 'phone'),
+    address: formString(fd, 'address'),
+    collector_id: '',
+    notes: formString(fd, 'notes'),
+    data_consent: fd.get('data_consent') === 'on' || fd.get('data_consent') === 'true',
+  });
+  if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+  const db = await userDb();
+  const { data: customerId, error } = await db.call<string>('create_customer', {
+    p_full_name: parsed.data.full_name,
+    p_document_type: parsed.data.document_type,
+    p_document_number: parsed.data.document_number,
+    p_phone: parsed.data.phone,
+    p_address: parsed.data.address || null,
+    p_collector_id: null,
+    p_notes: parsed.data.notes || null,
+    p_data_consent: true,
+  });
+  if (error) return { ok: false, error: friendlyError(error) };
+  revalidatePath('/cobrador', 'layout');
+  if (fd.get('create_account') !== 'on') {
+    return { ok: true, message: `Cliente ${parsed.data.full_name} registrado.` };
+  }
+  const access = await createCustomerAccess(customerId!, parsed.data.full_name, parsed.data.phone);
+  return access.ok
+    ? { ok: true, message: `Cliente registrado. Acceso a la app → Usuario: ${parsed.data.document_number} · Contraseña temporal: ${access.password} (entréguela al cliente; la cambiará al ingresar).` }
+    : { ok: false, error: `Cliente registrado, pero no se creó el acceso: ${access.error}` };
+}
+
+export async function collectorCreateAccess(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  await requireRole('collector');
+  const access = await createCustomerAccess(formString(fd, 'customer_id'), formString(fd, 'full_name'), formString(fd, 'phone'));
+  if (!access.ok) return { ok: false, error: access.error };
+  revalidatePath('/cobrador', 'layout');
+  return { ok: true, message: `Acceso creado → Usuario: ${formString(fd, 'document')} · Contraseña temporal: ${access.password}` };
+}
+
+async function createCustomerAccess(customerId: string, fullName: string, phone: string) {
+  const password = temporaryPassword();
+  const db = await userDb();
+  const { error } = await db.call('admin_create_user', {
+    p_email: null,
+    p_password_hash: await hashPassword(password),
+    p_full_name: fullName,
+    p_phone: phone || null,
+    p_role: 'customer',
+    p_customer_id: customerId,
+  });
+  return error ? { ok: false as const, error: friendlyError(error) } : { ok: true as const, password };
 }

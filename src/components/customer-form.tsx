@@ -8,9 +8,12 @@ import { customerSchema, type CustomerInput } from '@/lib/validation';
 export function CustomerForm({
   action,
   collectors,
+  allowAccount = false,
 }: {
   action: (s: ActionResult, fd: FormData) => Promise<ActionResult>;
+  /** Lista de cobradores para asignar; vacía = el cliente queda con quien lo registra. */
   collectors: { id: string; full_name: string }[];
+  allowAccount?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, { ok: true } as ActionResult);
   const ref = useRef<HTMLFormElement>(null);
@@ -23,8 +26,13 @@ export function CustomerForm({
   return (
     <form
       ref={ref}
-      // Valida en el cliente con Zod y, si todo es correcto, envía a la Server Action (que vuelve a validar).
-      onSubmit={handleSubmit(() => startTransition(() => formAction(new FormData(ref.current!))))}
+      // Sin JavaScript se envía igual por POST a la Server Action (nunca por GET: los datos no van en la URL).
+      action={formAction}
+      // Con JavaScript: valida con Zod y, si todo es correcto, envía (el servidor vuelve a validar).
+      onSubmit={(e) => {
+        e.preventDefault();
+        void handleSubmit(() => startTransition(() => formAction(new FormData(ref.current!))))(e);
+      }}
       className="space-y-3"
       noValidate
     >
@@ -41,7 +49,7 @@ export function CustomerForm({
           </select>
         </div>
         <div>
-          <label className="label" htmlFor="document_number">Número de documento</label>
+          <label className="label" htmlFor="document_number">Cédula / documento *</label>
           <input id="document_number" className="input" inputMode="numeric" autoComplete="off" {...register('document_number')} />
           {e.document_number && <p className="field-error">{e.document_number.message}</p>}
         </div>
@@ -55,17 +63,23 @@ export function CustomerForm({
         <label className="label" htmlFor="address">Dirección (para la ruta de cobro)</label>
         <input id="address" className="input" {...register('address')} />
       </div>
-      <div>
+      {collectors.length > 0 && <div>
         <label className="label" htmlFor="collector_id">Cobrador asignado</label>
         <select id="collector_id" className="input" {...register('collector_id')}>
           <option value="">Sin asignar</option>
           {collectors.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
         </select>
-      </div>
+      </div>}
       <div>
         <label className="label" htmlFor="notes">Notas internas</label>
         <textarea id="notes" rows={2} className="input" {...register('notes')} />
       </div>
+      {allowAccount && (
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="create_account" defaultChecked className="mt-1 size-4" />
+          <span>Crear acceso a la app (el cliente ingresa con su cédula y una contraseña temporal).</span>
+        </label>
+      )}
       <label className="flex items-start gap-2 text-sm">
         <input type="checkbox" className="mt-1 size-4" {...register('data_consent')} />
         <span>El cliente autorizó por escrito el tratamiento de sus datos personales (Ley 1581 de 2012) y conservo el soporte.</span>
@@ -73,6 +87,7 @@ export function CustomerForm({
       {e.data_consent && <p className="field-error">{e.data_consent.message}</p>}
       <button className="btn-primary" disabled={pending}>{pending ? 'Guardando…' : 'Crear cliente'}</button>
       {!state.ok && <p className="field-error" role="alert">{state.error}</p>}
+      {state.ok && 'message' in state && state.message && <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{state.message}</p>}
     </form>
   );
 }
