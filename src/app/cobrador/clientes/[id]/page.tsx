@@ -18,7 +18,7 @@ export default async function CollectorCustomerPage({ params }: { params: Promis
   const [loans, installments, payments, ops, doc] = await Promise.all([
     db.query(`select * from public.v_loan_balances where customer_id = $1 and status in ('active', 'paid') order by created_at desc`, [id]),
     db.query<any>('select * from public.v_installments where customer_id = $1 order by number', [id]),
-    db.query('select id, loan_id, receipt_number, amount, method, received_on, status from public.payments where customer_id = $1 order by received_at desc limit 30', [id]),
+    db.query('select id, loan_id, receipt_number, amount, method, received_on, status, public.staff_name(received_by) as received_by_name from public.payments where customer_id = $1 order by received_at desc limit 30', [id]),
     db.one<{ value: { collectors_can_create_customers?: boolean } }>(`select value from public.app_settings where key = 'operations'`),
     db.one<{ document_number: string }>('select document_number from public.customers where id = $1', [id]),
   ]);
@@ -73,7 +73,7 @@ export default async function CollectorCustomerPage({ params }: { params: Promis
             <li key={p.id} className="py-2">
               <div className="flex items-center justify-between gap-2">
                 <span>
-                  N.º {p.receipt_number} · {formatDate(p.received_on)} · {PAYMENT_METHOD[p.method]}
+                  N.º {p.receipt_number} · {formatDate(p.received_on)} · {PAYMENT_METHOD[p.method]} · registró {p.received_by_name ?? 'pasarela'}
                   {p.status === 'reversed' && <span className="ml-1 text-red-700">(reversado)</span>}
                 </span>
                 <Link href={`/comprobantes/${p.id}`} className="font-semibold text-brand-700 tabular-nums">{formatCOP(p.amount)}</Link>

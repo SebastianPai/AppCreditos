@@ -103,7 +103,7 @@ export default async function VerifyPaymentsPage() {
             <ul className="space-y-3">
               {handovers.map((h) => (
                 <li key={h.id} className="rounded-xl border border-slate-200 p-3 text-sm">
-                  <p className="font-semibold">{h.full_name} · {formatCOP(h.amount)}</p>
+                  <p className="font-semibold">{formatCOP(h.amount)} · registrada por {h.full_name}</p>
                   <p className="text-slate-500">{formatDateTime(h.declared_at)} {h.notes && `· ${h.notes}`}</p>
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <ActionForm action={confirmHandover} submitLabel="Recibí el dinero">

@@ -63,9 +63,10 @@ describe('19. Capital disponible', () => {
     expect(c).toMatchObject({ cash_admin: 400_000, cash_collectors: 180_000, loans_principal: 450_000, commission_payable: 7_500, unsettled_result: 22_500 });
     expect(c.available).toBe(400_000 - 7_500 - 22_500);
 
-    // El cobrador entrega el efectivo y administración lo confirma.
+    // El cobrador entrega el TOTAL del efectivo (no se permiten entregas parciales) y administración lo confirma.
+    await expect(db.rpc(C1(), 'declare_cash_handover', { p_amount: 100_000, p_notes: null })).rejects.toThrow(/debe entregar el total/);
     const h = await db.rpc<string>(C1(), 'declare_cash_handover', { p_amount: 180_000, p_notes: 'Recaudo del día' });
-    await expect(db.rpc(C1(), 'declare_cash_handover', { p_amount: 1, p_notes: null })).rejects.toThrow(/supera el efectivo/);
+    await expect(db.rpc(C1(), 'declare_cash_handover', { p_amount: 1, p_notes: null })).rejects.toThrow(/no tiene efectivo pendiente/);
     await expect(db.rpc(C1(), 'confirm_cash_handover', { p_handover_id: h, p_approve: true, p_notes: null })).rejects.toThrow(/FORBIDDEN/);
     await db.rpc(A(), 'confirm_cash_handover', { p_handover_id: h, p_approve: true, p_notes: null });
     c = await cap();

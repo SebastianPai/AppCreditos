@@ -14,12 +14,14 @@ export default async function CollectorCommissionsPage() {
   const [dash, payouts, handovers, commissions] = await Promise.all([
     db.rpc('collector_dashboard'),
     db.query('select * from public.collector_payouts where collector_id = $1 order by created_at desc', [profile.id]),
-    db.query('select * from public.cash_handovers where collector_id = $1 order by declared_at desc limit 20', [profile.id]),
+    db.query(`select h.*, public.staff_name(h.collector_id) as declared_by, public.staff_name(h.confirmed_by) as confirmed_by_name
+                from public.cash_handovers h where h.collector_id = $1 order by h.declared_at desc limit 20`, [profile.id]),
     db.query(`select c.id, c.kind, c.amount, c.created_at, c.payout_id, l.code as loan_code
                 from public.collector_commissions c join public.loans l on l.id = c.loan_id
                where c.collector_id = $1 order by c.created_at desc limit 50`, [profile.id]),
   ]);
   const d = dash as { commission_accrued_total: number; commission_pending: number; cash_in_custody: number; handovers_pending: number } | null;
+  const toHand = d ? d.cash_in_custody - d.handovers_pending : 0;
 
   return (
     <>
@@ -34,18 +36,25 @@ export default async function CollectorCommissionsPage() {
       )}
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <Card title="Entregar efectivo a administración">
-          <ActionForm action={declareHandover} submitLabel="Registrar entrega" resetOnSuccess>
-            <div>
-              <label className="label" htmlFor="amount">Valor entregado (COP)</label>
-              <input id="amount" name="amount" inputMode="numeric" required className="input" />
-            </div>
-            <input name="notes" maxLength={200} placeholder="Nota (opcional)" className="input" aria-label="Nota" />
-          </ActionForm>
+          {toHand > 0 ? (
+            <ActionForm action={declareHandover} submitLabel={`Entregar ${formatCOP(toHand)}`} confirmText="Entregué todo el efectivo cobrado a administración.">
+              <input type="hidden" name="amount" value={toHand} />
+              <p className="text-sm text-slate-600">Se entrega siempre el total cobrado en efectivo. Administración debe confirmar que lo recibió.</p>
+            </ActionForm>
+          ) : (
+            <EmptyState>{d?.handovers_pending ? 'Su entrega está pendiente de confirmación por administración.' : 'No tiene efectivo pendiente de entregar.'}</EmptyState>
+          )}
           <ul className="mt-4 divide-y divide-slate-100 text-sm">
             {(handovers ?? []).map((h) => (
-              <li key={h.id} className="flex justify-between py-2">
-                <span>{formatDateTime(h.declared_at)} · {h.status === 'pending' ? 'Pendiente' : h.status === 'confirmed' ? 'Confirmada' : 'Rechazada'}</span>
-                <span className="font-semibold tabular-nums">{formatCOP(h.amount)}</span>
+              <li key={h.id} className="py-2">
+                <div className="flex justify-between">
+                  <span>{formatDateTime(h.declared_at)}</span>
+                  <span className="font-semibold tabular-nums">{formatCOP(h.amount)}</span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Registrada por {h.declared_by ?? '—'} ·{' '}
+                  {h.status === 'pending' ? 'pendiente de confirmar' : `${h.status === 'confirmed' ? 'confirmada' : 'rechazada'} por ${h.confirmed_by_name ?? 'administración'}`}
+                </p>
               </li>
             ))}
           </ul>

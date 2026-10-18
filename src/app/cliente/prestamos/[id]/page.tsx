@@ -15,7 +15,7 @@ export default async function CustomerLoanPage({ params }: { params: Promise<{ i
   const [balance, installments, payments] = await Promise.all([
     db.one('select * from public.v_loan_balances where id = $1', [id]),
     db.query<any>('select * from public.v_installments where loan_id = $1 order by number', [id]),
-    db.query('select id, receipt_number, amount, method, received_on, status from public.payments where loan_id = $1 order by received_at desc', [id]),
+    db.query('select id, receipt_number, amount, method, received_on, status, public.staff_name(received_by) as received_by_name from public.payments where loan_id = $1 order by received_at desc', [id]),
   ]);
 
   return (
@@ -45,7 +45,7 @@ export default async function CustomerLoanPage({ params }: { params: Promise<{ i
           {(payments ?? []).map((p) => (
             <li key={p.id} className="flex items-center justify-between py-2">
               <span>
-                N.º {p.receipt_number} · {formatDate(p.received_on)} · {PAYMENT_METHOD[p.method]}
+                N.º {p.receipt_number} · {formatDate(p.received_on)} · {PAYMENT_METHOD[p.method]} · recibió {p.received_by_name ?? 'pasarela'}
                 {p.status === 'reversed' && <span className="ml-1 text-red-700">(reversado)</span>}
               </span>
               <Link href={`/comprobantes/${p.id}`} className="font-semibold text-brand-700 tabular-nums">{formatCOP(p.amount)} · comprobante</Link>

@@ -22,7 +22,7 @@ export default async function AdminLoanPage({ params }: { params: Promise<{ id: 
   const [balance, installments, payments, capital, commissions] = await Promise.all([
     db.one('select * from public.v_loan_balances where id = $1', [id]),
     db.query<any>('select * from public.v_installments where loan_id = $1 order by number', [id]),
-    db.query('select * from public.payments where loan_id = $1 order by received_at desc', [id]),
+    db.query('select p.*, public.staff_name(p.received_by) as received_by_name from public.payments p where p.loan_id = $1 order by p.received_at desc', [id]),
     db.rpc('capital_summary'),
     db.query<{ amount: number }>('select amount from public.collector_commissions where loan_id = $1', [id]),
   ]);
@@ -104,12 +104,13 @@ export default async function AdminLoanPage({ params }: { params: Promise<{ id: 
       <Card title="Pagos" className="mt-4">
         <TableWrap>
           <table className="table">
-            <thead><tr><th>Recibo</th><th>Fecha</th><th>Medio</th><th className="num">Valor</th><th className="num">Capital</th><th className="num">Interés</th><th className="num">Comisión</th><th>Estado</th><th /></tr></thead>
+            <thead><tr><th>Recibo</th><th>Fecha</th><th>Registró</th><th>Medio</th><th className="num">Valor</th><th className="num">Capital</th><th className="num">Interés</th><th className="num">Comisión</th><th>Estado</th><th /></tr></thead>
             <tbody>
               {(payments ?? []).map((p) => (
                 <tr key={p.id}>
                   <td><Link href={`/comprobantes/${p.id}`} className="text-brand-700">{p.receipt_number}</Link></td>
                   <td className="whitespace-nowrap">{formatDate(p.received_on)}</td>
+                  <td>{p.received_by_name ?? 'Pasarela'}</td>
                   <td>{PAYMENT_METHOD[p.method]}</td>
                   <td className="num">{formatCOP(p.amount)}</td>
                   <td className="num">{formatCOP(p.principal_amount)}</td>
