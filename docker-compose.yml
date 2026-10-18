@@ -1,0 +1,35 @@
+# Entorno local completo: PostgreSQL 17 + la aplicación.
+#   docker compose up --build
+#   docker compose exec app node scripts/seed-demo.mjs     (datos y usuarios de demostración)
+# App en http://localhost:3000
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/docker-init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d capital_control"]
+      interval: 3s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Usuario propietario NO superusuario: FORCE ROW LEVEL SECURITY se aplica igual que en Heroku.
+      DATABASE_URL: postgres://capital_app:capital_app@db:5432/capital_control
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      CRON_SECRET: cambie-este-secreto-local
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
