@@ -21,7 +21,12 @@ try {
     process.stdout.write(`Aplicando ${file}… `);
     await client.query('begin');
     try {
-      await client.query(readFileSync(join(dir, file), 'utf8'));
+      // Heroku Postgres valida el texto de cada CREATE EXTENSION; se ejecutan aisladas
+      // para que el resto del archivo (con expresiones regulares y barras) no interfiera.
+      const sql = readFileSync(join(dir, file), 'utf8');
+      const extensions = sql.match(/^create extension[^;]*;/gim) ?? [];
+      for (const ext of extensions) await client.query(ext);
+      await client.query(sql.replace(/^create extension[^;]*;/gim, ''));
       await client.query('insert into ops.schema_migrations (version) values ($1)', [file]);
       await client.query('commit');
       applied++;
