@@ -193,3 +193,33 @@ describe('Créditos simples creados por el cobrador', () => {
     await db.rpc(A(), 'update_setting', { p_key: 'operations', p_value: { collectors_can_create_customers: true, collectors_can_approve_loans: true } });
   });
 });
+
+describe('Eliminar cliente de prueba', () => {
+  it('borra el cliente y todo lo suyo, deja los saldos como antes y conserva la auditoría', async () => {
+    const before = await cap();
+    const auditBefore = n((await db.owner<any>('select count(*) as n from public.audit_logs'))[0].n);
+    const cust = await db.rpc<string>(C1(), 'create_customer', {
+      p_full_name: 'Cliente de Prueba', p_document_type: 'CC', p_document_number: '777000111', p_phone: '3000000000',
+      p_address: null, p_collector_id: null, p_notes: null, p_data_consent: true,
+    });
+    const loan = await db.rpc<string>(C1(), 'create_simple_loan', { p_customer_id: cust, p_principal: 300_000, p_installments: 4, p_frequency: 'weekly' });
+    await db.rpc(C1(), 'register_payment', {
+      p_loan_id: loan, p_amount: 90_000, p_idempotency_key: randomUUID(), p_method: 'cash', p_received_on: null, p_notes: null, p_evidence_path: null,
+    });
+
+    await expect(db.rpc(C1(), 'admin_purge_test_customer', { p_customer_id: cust, p_confirm: 'ELIMINAR' })).rejects.toThrow(/FORBIDDEN|admin/i);
+    await expect(db.rpc(A(), 'admin_purge_test_customer', { p_customer_id: cust, p_confirm: 'si' })).rejects.toThrow(/ELIMINAR/);
+    await db.rpc(A(), 'admin_purge_test_customer', { p_customer_id: cust, p_confirm: 'eliminar' });
+
+    expect(await db.owner('select 1 from public.customers where id = $1', [cust])).toHaveLength(0);
+    expect(await db.owner('select 1 from public.loans where id = $1', [loan])).toHaveLength(0);
+    expect(await db.owner('select 1 from public.payments where loan_id = $1', [loan])).toHaveLength(0);
+    expect(await db.owner('select 1 from public.financial_transactions where loan_id = $1', [loan])).toHaveLength(0);
+    expect(await cap()).toEqual(before);
+    const auditAfter = n((await db.owner<any>('select count(*) as n from public.audit_logs'))[0].n);
+    expect(auditAfter).toBeGreaterThan(auditBefore);
+    expect(await db.owner(`select 1 from public.audit_logs where action = 'purge_test_customer' and record_id = $1`, [cust])).toHaveLength(1);
+    // Las protecciones siguen activas fuera de la función.
+    await expect(db.owner('delete from public.audit_logs')).rejects.toThrow(/IMMUTABLE/);
+  });
+});

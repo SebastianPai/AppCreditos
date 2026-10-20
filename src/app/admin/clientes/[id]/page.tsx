@@ -5,7 +5,7 @@ import { Card, KeyValue, LinkButton, PageHeader, StatusBadge, TableWrap } from '
 import { formatCOP, formatDate, formatDateTime } from '@/lib/finance';
 import { APPLICATION_STATUS, CUSTOMER_STATUS, LOAN_STATUS, PAYMENT_METHOD } from '@/lib/labels';
 import { userDb } from '@/lib/auth';
-import { assignCollector, createUser, updateCustomer } from '../../actions';
+import { assignCollector, createUser, purgeTestCustomer, updateCustomer } from '../../actions';
 
 export default async function AdminCustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -119,7 +119,19 @@ export default async function AdminCustomerPage({ params }: { params: Promise<{ 
             ))}
           </ul>
         </Card>
-      </div>
+            </div>
+
+      <details className="mt-6 rounded-2xl border border-red-200 p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-red-700">Eliminar cliente de prueba</summary>
+        <p className="mt-2 text-sm text-slate-600">
+          Borra este cliente y todo lo suyo: acceso a la app, préstamos, cuotas, pagos y comprobantes. Desaparece de pantallas,
+          informes y saldos. No se puede deshacer. La eliminación queda anotada en Auditoría.
+        </p>
+        <ActionForm action={purgeTestCustomer} submitLabel="Eliminar definitivamente" variant="danger" className="mt-3 space-y-2">
+          <input type="hidden" name="customer_id" value={c.id} />
+          <input name="confirm" required autoComplete="off" placeholder="Escriba ELIMINAR" className="input" aria-label="Confirmación" />
+        </ActionForm>
+      </details>
     </>
   );
 }

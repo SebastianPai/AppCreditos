@@ -22,6 +22,23 @@ async function rpc(fn: string, args: Record<string, unknown>, message: string, p
 }
 
 // ---------------------------------------------------------------- Clientes
+/**
+ * Elimina un cliente de prueba con todo lo suyo (préstamos, pagos, asientos, acceso a la app).
+ * La auditoría se conserva y registra la eliminación. Pide escribir ELIMINAR.
+ */
+export async function purgeTestCustomer(_: ActionResult, fd: FormData): Result {
+  await requireRole('admin');
+  const db = await userDb();
+  const { error } = await db.call('admin_purge_test_customer', {
+    p_customer_id: formString(fd, 'customer_id'),
+    p_confirm: formString(fd, 'confirm'),
+  });
+  if (error) return { ok: false, error: friendlyError(error) };
+  revalidatePath('/admin', 'layout');
+  revalidatePath('/cobrador', 'layout');
+  redirect('/admin/clientes?eliminado=1');
+}
+
 export async function createCustomer(_: ActionResult, fd: FormData): Result {
   await requireRole('admin');
   const parsed = customerSchema.safeParse({

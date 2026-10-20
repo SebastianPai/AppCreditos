@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Card, EmptyState, LinkButton, PageHeader, StatusBadge, TableWrap } from '@/components/ui';
+import { Card, EmptyState, LinkButton, Notice, PageHeader, StatusBadge, TableWrap } from '@/components/ui';
 import { formatCOP, formatDate } from '@/lib/finance';
 import { CUSTOMER_STATUS } from '@/lib/labels';
 import { userDb } from '@/lib/auth';
@@ -7,8 +7,8 @@ import { uuidOrNull } from '@/lib/validation';
 
 export const metadata = { title: 'Clientes' };
 
-export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; cobrador?: string }> }) {
-  const { q, cobrador } = await searchParams;
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; cobrador?: string; eliminado?: string }> }) {
+  const { q, cobrador, eliminado } = await searchParams;
   const db = await userDb();
   const term = q ? `%${q.replace(/[%_\\]/g, '')}%` : null;
   const [data, collectors] = await Promise.all([
@@ -25,6 +25,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader title="Clientes" actions={<LinkButton href="/admin/clientes/nuevo">Nuevo cliente</LinkButton>} />
+      {eliminado === '1' && <div className="mb-4"><Notice tone="neutral">Cliente de prueba eliminado.</Notice></div>}
       <form className="mb-4 grid gap-2 sm:grid-cols-[1fr_220px_auto]">
         <input name="q" defaultValue={q} placeholder="Buscar por nombre, código o teléfono" className="input" aria-label="Buscar" />
         <select name="cobrador" defaultValue={cobrador ?? ''} className="input" aria-label="Cobrador">
