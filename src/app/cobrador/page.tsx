@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LinkPending } from '@/components/loading-screen';
 import { requireRole, userDb } from '@/lib/auth';
 import { dueStatus, formatCOP, todayBogota } from '@/lib/finance';
 
@@ -70,7 +71,7 @@ function BigButton({ href, title, text, primary = false }: { href: string; title
         <span className="block text-lg font-semibold">{title}</span>
         <span className={`text-sm ${primary ? 'text-slate-300' : 'text-slate-500'}`}>{text}</span>
       </span>
-      <span aria-hidden className="text-2xl">›</span>
+      <span aria-hidden className="text-2xl"><LinkPending>›</LinkPending></span>
     </Link>
   );
 }

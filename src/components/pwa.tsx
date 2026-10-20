@@ -8,8 +8,12 @@ export function ServiceWorkerRegister() {
   useEffect(() => {
     if (!('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') return;
     let reloading = false;
+    // Solo se recarga al ACTUALIZAR (ya había un service worker). En la primera visita el
+    // service worker toma el control sin recargar: antes eso recargaba la página de sorpresa
+    // y se perdían los toques del usuario.
+    const hadController = Boolean(navigator.serviceWorker.controller);
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (reloading) return;
+      if (reloading || !hadController) return;
       reloading = true;
       window.location.reload();
     });

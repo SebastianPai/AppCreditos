@@ -66,7 +66,7 @@ export default async function CollectorCustomerPage({ params, searchParams }: { 
               </p>
             )}
             <div id="pago" className="mt-4">
-              <h2 className="mb-2 font-semibold">Registrar pago</h2>
+              <h2 className="mb-2 font-semibold">Registrar pago de hoy</h2>
               <PaymentForm loanId={l.id} outstanding={l.outstanding} nextDue={next?.outstanding ?? 0} action={registerPayment} today={today} />
             </div>
             <MoreSection label="Ver todas las cuotas" className="mt-3">

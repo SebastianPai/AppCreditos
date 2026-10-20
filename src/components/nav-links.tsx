@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { LinkPending } from './loading-screen';
 
 export interface NavItem {
   href: string;
@@ -54,7 +55,7 @@ export function NavLinks({ items, variant }: { items: NavItem[]; variant: 'sideb
               className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${active(i.href) ? 'text-brand-700' : 'text-slate-500'}`}
               aria-current={active(i.href) ? 'page' : undefined}
             >
-              <Icon name={i.icon} />
+              <LinkPending><Icon name={i.icon} /></LinkPending>
               {i.label}
             </Link>
           </li>
@@ -71,7 +72,7 @@ export function NavLinks({ items, variant }: { items: NavItem[]; variant: 'sideb
             className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm ${active(i.href) ? 'bg-brand-50 font-semibold text-brand-700' : 'text-slate-700 hover:bg-slate-50'}`}
             aria-current={active(i.href) ? 'page' : undefined}
           >
-            <Icon name={i.icon} />
+            <LinkPending><Icon name={i.icon} /></LinkPending>
             {i.label}
           </Link>
         </li>

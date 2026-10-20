@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { ROLE_LABEL, type SessionProfile } from '@/lib/auth';
 import { NavLinks, type NavItem } from './nav-links';
 import { OnlineStatus } from './pwa';
+import { SignOutButton } from './loading-screen';
 
 const NAV: Record<SessionProfile['role'], NavItem[]> = {
   admin: [
@@ -51,7 +52,7 @@ export function AppShell({ profile, children }: { profile: SessionProfile; child
             <p className="font-medium">{profile.full_name}</p>
             <p className="text-slate-500">{ROLE_LABEL[profile.role]}</p>
             <form action="/auth/signout" method="post" className="mt-3">
-              <button className="btn-secondary btn-sm w-full">Cerrar sesión</button>
+              <SignOutButton className="btn-secondary btn-sm w-full" />
             </form>
           </div>
         </div>
@@ -69,7 +70,7 @@ export function AppShell({ profile, children }: { profile: SessionProfile; child
               {items.length > 5 && <NavLinks items={items.slice(4)} variant="menu" />}
               <Link href="/instalar" className="block rounded-lg px-2 py-2 text-sm hover:bg-slate-50">Instalar la app</Link>
               <form action="/auth/signout" method="post">
-                <button className="w-full rounded-lg px-2 py-2 text-left text-sm text-red-700 hover:bg-red-50">Cerrar sesión</button>
+                <SignOutButton className="w-full rounded-lg px-2 py-2 text-left text-sm text-red-700 hover:bg-red-50" />
               </form>
             </div>
           </details>
