@@ -1,104 +1,76 @@
 import Link from 'next/link';
-import { Badge, Card, EmptyState, MoreSection, PageHeader, Stat, StatGrid } from '@/components/ui';
-import { requireRole } from '@/lib/auth';
-import { addDays, dueStatus, formatCOP, formatDate, todayBogota } from '@/lib/finance';
-import { userDb } from '@/lib/auth';
+import { requireRole, userDb } from '@/lib/auth';
+import { dueStatus, formatCOP, todayBogota } from '@/lib/finance';
 
-export const metadata = { title: 'Cobros de hoy' };
-
-interface Dashboard {
-  today: string;
-  assigned_customers: number;
-  due_today: { count: number; amount: number };
-  overdue: { count: number; amount: number };
-  collected_today: { count: number; amount: number };
-  commission_accrued_total: number;
-  commission_pending: number;
-  cash_in_custody: number;
-  handovers_pending: number;
-}
+export const metadata = { title: 'Inicio' };
 
 export default async function CollectorHome() {
   const profile = await requireRole('collector');
   const db = await userDb();
   const today = todayBogota();
-  const [dash, agenda, customers] = await Promise.all([
-    db.rpc('collector_dashboard'),
-    db.query<{ id: string; loan_id: string; loan_code: string; customer_id: string; number: number; due_date: string; total_amount: number; outstanding: number; effective_status: string }>(
-      `select id, loan_id, loan_code, customer_id, number, due_date, total_amount, outstanding, effective_status
-         from public.v_installments
-        where collector_id = $1 and loan_status = 'active' and outstanding > 0 and due_date <= $2
-        order by due_date limit 200`, [profile.id, addDays(today, 7)]),
-    db.query<{ id: string; full_name: string; phone: string; address: string | null }>(
-      'select id, full_name, phone, address from public.customers where collector_id = $1', [profile.id]),
+  const [due, totals] = await Promise.all([
+    db.query<{ customer_id: string; full_name: string; due_date: string; outstanding: number }>(
+      `select i.customer_id, c.full_name, i.due_date, i.outstanding
+         from public.v_installments i join public.customers c on c.id = i.customer_id
+        where i.collector_id = $1 and i.loan_status = 'active' and i.outstanding > 0 and i.due_date <= $2
+        order by i.due_date limit 5`, [profile.id, today]),
+    db.one<{ customers: number; owed: number; due_today: number }>(
+      `select count(distinct c.id)::int as customers,
+              coalesce((select sum(outstanding) from public.v_installments where collector_id = $1 and loan_status = 'active'), 0)::bigint as owed,
+              coalesce((select sum(outstanding) from public.v_installments where collector_id = $1 and loan_status = 'active' and due_date <= $2), 0)::bigint as due_today
+         from public.customers c where c.collector_id = $1 and c.status = 'active'`, [profile.id, today]),
   ]);
-  const d = dash as Dashboard | null;
-  const byId = new Map((customers ?? []).map((c) => [c.id, c]));
-  const dueNow = (agenda ?? []).filter((i) => i.due_date <= today);
-  const upcoming = (agenda ?? []).filter((i) => i.due_date > today);
 
   return (
     <>
-      <PageHeader title="Cobros de hoy" subtitle={formatDate(today)} />
-      {d && (
-        <>
-          <div className="grid grid-cols-2 gap-3">
-            <Stat label="Por cobrar hoy" value={formatCOP(d.due_today.amount + d.overdue.amount)} hint={`${d.due_today.count + d.overdue.count} cuotas`} definition="Saldo de las cuotas que vencen hoy más las vencidas." />
-            <Stat label="Cobrado hoy" value={formatCOP(d.collected_today.amount)} hint={`${d.collected_today.count} pagos`} tone="success" />
-          </div>
-          <MoreSection className="mt-3">
-            <StatGrid>
-              <Stat label="Vencido" value={formatCOP(d.overdue.amount)} hint={`${d.overdue.count} cuotas`} tone={d.overdue.count ? 'danger' : undefined} />
-              <Stat label="Clientes" value={d.assigned_customers} />
-              <Stat label="Efectivo en su poder" value={formatCOP(d.cash_in_custody)} definition="Cobrado en efectivo y aún no entregado a administración. No es ganancia suya." />
-              <Stat label="Mi comisión" value={formatCOP(d.commission_accrued_total)} hint={`Por pagar ${formatCOP(d.commission_pending)}`} definition="5 % del capital de cada préstamo, a medida que se cobra el interés." />
-            </StatGrid>
-          </MoreSection>
-        </>
-      )}
+      <h1 className="text-2xl font-bold">Hola, {profile.full_name.split(' ')[0]}</h1>
+      <p className="mb-5 text-sm text-slate-500">¿Qué quiere hacer?</p>
 
-      <Card title={`Para cobrar hoy (${dueNow.length})`} className="mt-5">
-        {!dueNow.length ? <EmptyState>No hay cuotas pendientes para hoy.</EmptyState> : <AgendaList rows={dueNow} byId={byId} />}
-      </Card>
-      {upcoming.length > 0 && (
-        <MoreSection label={`Próximos 7 días (${upcoming.length})`} className="mt-4">
-          <Card><AgendaList rows={upcoming} byId={byId} /></Card>
-        </MoreSection>
-      )}
+      <div className="grid gap-3">
+        <BigButton href="/cobrador/clientes/nuevo" title="Nuevo cliente" text="Registrar una persona" primary />
+        <BigButton href="/cobrador/prestamos/nuevo" title="Crear préstamo" text="Prestar dinero a un cliente" primary />
+        <BigButton href="/cobrador/clientes" title="Ver clientes" text={`${totals?.customers ?? 0} clientes · deben ${formatCOP(totals?.owed ?? 0)}`} />
+      </div>
+
+      <section className="mt-6">
+        <div className="mb-2 flex items-end justify-between">
+          <h2 className="font-semibold">Para cobrar hoy</h2>
+          <span className="font-semibold tabular-nums">{formatCOP(totals?.due_today ?? 0)}</span>
+        </div>
+        {!due?.length ? (
+          <p className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">Nadie tiene cuota para hoy.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200">
+            {due.map((r, i) => {
+              const st = dueStatus(r.due_date, today);
+              return (
+                <li key={i}>
+                  <Link href={`/cobrador/clientes/${r.customer_id}`} className="flex items-center justify-between gap-3 px-3 py-3">
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{r.full_name}</span>
+                      <span className={`text-xs ${st.days < 0 ? 'font-semibold text-red-700' : 'text-slate-500'}`}>{st.text}</span>
+                    </span>
+                    <span className="font-semibold tabular-nums">{formatCOP(r.outstanding)}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <Link href="/cobrador/clientes" className="mt-2 block text-center text-sm font-medium text-slate-700 underline">Ver todos</Link>
+      </section>
     </>
   );
 }
 
-function AgendaList({
-  rows,
-  byId,
-}: {
-  rows: { id: string; loan_id: string; loan_code: string; customer_id: string; number: number; due_date: string; outstanding: number; effective_status: string }[];
-  byId: Map<string, { id: string; full_name: string; phone: string; address: string | null }>;
-}) {
+function BigButton({ href, title, text, primary = false }: { href: string; title: string; text: string; primary?: boolean }) {
   return (
-    <ul className="divide-y divide-slate-100">
-      {rows.map((r) => {
-        const c = byId.get(r.customer_id);
-        return (
-          <li key={r.id} className="flex items-center justify-between gap-3 py-3">
-            <div className="min-w-0">
-              <p className="truncate font-medium">{c?.full_name ?? 'Cliente'}</p>
-              <p className="text-xs text-slate-500">
-                Cuota {r.number} · {formatDate(r.due_date)}
-              </p>
-              <div className="mt-1">{(() => { const st = dueStatus(r.due_date, todayBogota()); return <Badge tone={st.tone}>{st.text}</Badge>; })()}</div>
-            </div>
-            <div className="flex shrink-0 flex-col items-end gap-1">
-              <span className="font-semibold tabular-nums">{formatCOP(r.outstanding)}</span>
-              <div className="flex gap-1">
-                {c?.phone && <a href={`tel:${c.phone.replace(/\s/g, '')}`} className="btn-secondary btn-sm" aria-label="Llamar">📞</a>}
-                <Link href={`/cobrador/clientes/${r.customer_id}?prestamo=${r.loan_id}#pago`} className="btn-primary btn-sm">Cobrar</Link>
-              </div>
-            </div>
-          </li>
-        );
-      })}
-    </ul>
+    <Link href={href} className={`flex items-center justify-between rounded-2xl px-5 py-4 ${primary ? 'bg-slate-800 text-white' : 'border border-slate-300 bg-white text-slate-900'}`}>
+      <span>
+        <span className="block text-lg font-semibold">{title}</span>
+        <span className={`text-sm ${primary ? 'text-slate-300' : 'text-slate-500'}`}>{text}</span>
+      </span>
+      <span aria-hidden className="text-2xl">›</span>
+    </Link>
   );
 }

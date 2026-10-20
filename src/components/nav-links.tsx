@@ -23,6 +23,8 @@ const ICONS = {
   eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zm10 3a3 3 0 100-6 3 3 0 000 6z',
   bell: 'M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9zM10 21h4',
   calc: 'M6 3h12v18H6zM9 7h6M9 12h1m4 0h1m-6 4h1m4 0h1',
+  plus: 'M12 5v14M5 12h14',
+  star: 'M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z',
   qr: 'M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h2v2h-2zm4 0h2v6h-6v-2',
 };
 
@@ -38,7 +40,9 @@ export function NavLinks({ items, variant }: { items: NavItem[]; variant: 'sideb
   const path = usePathname();
   // La raíz de cada rol (/admin, /cobrador…) solo se marca en coincidencia exacta.
   const isRoot = (href: string) => href.split('/').length === 2;
-  const active = (href: string) => path === href || (!isRoot(href) && path.startsWith(`${href}/`));
+  // Si otra opción coincide exactamente (p. ej. /clientes/nuevo), solo esa se marca.
+  const exact = items.some((i) => i.href === path);
+  const active = (href: string) => path === href || (!exact && !isRoot(href) && path.startsWith(`${href}/`));
 
   if (variant === 'bottom') {
     return (

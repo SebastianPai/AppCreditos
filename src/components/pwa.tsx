@@ -91,7 +91,7 @@ export function InstallPrompt() {
     };
   }, []);
 
-  if (installed) return <p className="text-sm text-emerald-700">La aplicación ya está instalada en este dispositivo.</p>;
+  if (installed) return <p className="text-sm text-slate-800">La aplicación ya está instalada en este dispositivo.</p>;
   if (deferred) {
     return (
       <button
@@ -184,7 +184,7 @@ export function PushToggle({ vapidPublicKey, initiallyEnabled }: { vapidPublicKe
           {status === 'working' ? 'Activando…' : 'Activar notificaciones'}
         </button>
       )}
-      {status === 'enabled' && <p className="text-sm text-emerald-700">Notificaciones activas en este dispositivo.</p>}
+      {status === 'enabled' && <p className="text-sm text-slate-800">Notificaciones activas en este dispositivo.</p>}
       {error && <p className="field-error">{error}</p>}
     </div>
   );

@@ -103,7 +103,7 @@ export default async function CapitalPage() {
                       <td>{t.tx_number}</td>
                       <td className="whitespace-nowrap">{formatDate(t.occurred_on)}</td>
                       <td>{TX_LABEL[t.kind] ?? t.kind}</td>
-                      <td className={`num ${cash < 0 ? 'text-red-700' : 'text-emerald-700'}`}>{formatCOP(cash)}</td>
+                      <td className={`num ${cash < 0 ? 'text-red-700' : 'text-slate-800'}`}>{formatCOP(cash)}</td>
                     </tr>
                   );
                 })}

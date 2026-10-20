@@ -1,10 +1,12 @@
 'use server';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { requireRole, userDb } from '@/lib/auth';
 import { friendlyError, type ActionResult } from '@/lib/errors';
 import { customerUserOfLoan, notifyUsers } from '@/lib/push';
 import { hashPassword, temporaryPassword } from '@/lib/password';
-import { customerSchema, firstIssue, formOptional, formPesos, formString, paymentSchema } from '@/lib/validation';
+import { customerSchema, firstIssue, formOptional, formPesos, formString, frequency, paymentSchema } from '@/lib/validation';
+import { z } from 'zod';
 
 export type PaymentResult = ActionResult<{ payment_id: string; receipt_number: number; duplicate: boolean; is_partial: boolean }>;
 
@@ -106,14 +108,15 @@ export async function collectorCreateCustomer(_: ActionResult, fd: FormData): Pr
 
 export async function collectorCreateAccess(_: ActionResult, fd: FormData): Promise<ActionResult> {
   await requireRole('collector');
-  const access = await createCustomerAccess(formString(fd, 'customer_id'), formString(fd, 'full_name'), formString(fd, 'phone'));
+  const doc = formString(fd, 'document');
+  const access = await createCustomerAccess(formString(fd, 'customer_id'), formString(fd, 'full_name'), formString(fd, 'phone'), doc);
   if (!access.ok) return { ok: false, error: access.error };
   revalidatePath('/cobrador', 'layout');
-  return { ok: true, message: `Acceso creado → Usuario: ${formString(fd, 'document')} · Contraseña temporal: ${access.password}` };
+  return { ok: true, message: `Acceso creado → Usuario: ${doc} · Contraseña inicial: ${doc} (la cambiará al entrar).` };
 }
 
-async function createCustomerAccess(customerId: string, fullName: string, phone: string) {
-  const password = temporaryPassword();
+async function createCustomerAccess(customerId: string, fullName: string, phone: string, initialPassword?: string) {
+  const password = initialPassword || temporaryPassword();
   const db = await userDb();
   const { error } = await db.call('admin_create_user', {
     p_email: null,
@@ -124,4 +127,79 @@ async function createCustomerAccess(customerId: string, fullName: string, phone:
     p_customer_id: customerId,
   });
   return error ? { ok: false as const, error: friendlyError(error) } : { ok: true as const, password };
+}
+
+/**
+ * Registro rápido de cliente: nombre, cédula, teléfono y dirección. Si se pide, crea su acceso
+ * a la app (usuario y contraseña inicial: su cédula; la cambia al ingresar). Luego lleva a crear el préstamo.
+ */
+export async function quickCreateCustomer(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  await requireRole('collector');
+  const parsed = customerSchema.safeParse({
+    full_name: formString(fd, 'full_name'),
+    document_type: 'CC',
+    document_number: formString(fd, 'document_number'),
+    phone: formString(fd, 'phone'),
+    address: formString(fd, 'address'),
+    collector_id: '',
+    notes: '',
+    data_consent: fd.get('data_consent') === 'on',
+  });
+  if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+  const db = await userDb();
+  const { data: customerId, error } = await db.call<string>('create_customer', {
+    p_full_name: parsed.data.full_name,
+    p_document_type: 'CC',
+    p_document_number: parsed.data.document_number,
+    p_phone: parsed.data.phone,
+    p_address: parsed.data.address || null,
+    p_collector_id: null,
+    p_notes: null,
+    p_data_consent: true,
+  });
+  if (error) return { ok: false, error: friendlyError(error) };
+  let access = '';
+  if (fd.get('create_account') === 'on') {
+    const { error: accErr } = await db.call('admin_create_user', {
+      p_email: null,
+      p_password_hash: await hashPassword(parsed.data.document_number),
+      p_full_name: parsed.data.full_name,
+      p_phone: parsed.data.phone,
+      p_role: 'customer',
+      p_customer_id: customerId,
+    });
+    access = accErr ? '&acceso=error' : '&acceso=1';
+  }
+  revalidatePath('/cobrador', 'layout');
+  redirect(`/cobrador/prestamos/nuevo?cliente=${customerId}&nuevo=1${access}`);
+}
+
+const loanSchema = z.object({
+  customer_id: z.string().uuid('Elija el cliente'),
+  principal: z.number().int().positive('Escriba cuánto dinero'),
+  installments: z.coerce.number().int().min(1).max(5),
+  frequency,
+});
+
+/** Crea el préstamo en un solo paso: queda activo desde hoy y a cargo del cobrador. */
+export async function createLoan(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  await requireRole('collector');
+  const parsed = loanSchema.safeParse({
+    customer_id: formString(fd, 'customer_id'),
+    principal: formPesos(fd, 'principal'),
+    installments: formString(fd, 'installments'),
+    frequency: formString(fd, 'frequency'),
+  });
+  if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+  const db = await userDb();
+  const { error } = await db.call('create_simple_loan', {
+    p_customer_id: parsed.data.customer_id,
+    p_principal: parsed.data.principal,
+    p_installments: parsed.data.installments,
+    p_frequency: parsed.data.frequency,
+    p_collector_id: null,
+  });
+  if (error) return { ok: false, error: friendlyError(error) };
+  revalidatePath('/cobrador', 'layout');
+  redirect(`/cobrador/clientes/${parsed.data.customer_id}?creado=1`);
 }

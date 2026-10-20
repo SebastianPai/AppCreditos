@@ -16,10 +16,13 @@ import {
   paymentCommission,
   splitAmongPartners,
   validateTerms,
+  installmentOptions,
   type InstallmentState,
 } from '@/lib/finance';
 
 const START = '2026-11-02';
+/** Motor genérico (1–5 cuotas) para probar redondeos; la política del negocio solo permite 4 o 5. */
+const ANY = { ...DEFAULT_POLICY, minInstallments: 1 };
 
 describe('Reglas del préstamo (20 % único sobre el capital)', () => {
   it('1. $600.000 al 20 % genera $120.000 de interés total', () => {
@@ -49,7 +52,7 @@ describe('Reglas del préstamo (20 % único sobre el capital)', () => {
   it('el interés no es por cuota ni compuesto: no cambia con el número de cuotas ni la modalidad', () => {
     for (const n of [1, 2, 3, 4, 5]) {
       for (const f of ['weekly', 'biweekly'] as const) {
-        expect(computeTerms(600_000, n, f, START).interestTotal).toBe(120_000);
+        expect(computeTerms(600_000, n, f, START, ANY).interestTotal).toBe(120_000);
       }
     }
   });
@@ -71,15 +74,18 @@ describe('Reglas del préstamo (20 % único sobre el capital)', () => {
     expect(() => validateTerms(500_000, 4, 'biweekly')).not.toThrow();
   });
 
-  it('máximo de cinco cuotas', () => {
+  it('solo se permiten 4 o 5 cuotas', () => {
     expect(() => validateTerms(600_000, 6, 'weekly')).toThrow(TermsError);
-    expect(() => validateTerms(600_000, 0, 'weekly')).toThrow(TermsError);
+    for (const n of [0, 1, 2, 3]) expect(() => validateTerms(600_000, n, 'weekly')).toThrow(TermsError);
+    expect(() => validateTerms(600_000, 4, 'weekly')).not.toThrow();
+    expect(() => validateTerms(600_000, 5, 'biweekly')).not.toThrow();
+    expect(installmentOptions()).toEqual([4, 5]);
   });
 
   it('reparte pesos residuales de forma determinista y exacta', () => {
     for (const principal of [100_001, 333_333, 777_777, 1_234_567, 50_003]) {
       for (const n of [1, 2, 3, 4, 5]) {
-        const t = computeTerms(principal, n, 'weekly', START);
+        const t = computeTerms(principal, n, 'weekly', START, ANY);
         const s = t.schedule;
         expect(s.reduce((a, r) => a + r.total, 0)).toBe(t.totalAmount);
         expect(s.reduce((a, r) => a + r.principal, 0)).toBe(principal);

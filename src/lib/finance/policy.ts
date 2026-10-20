@@ -4,6 +4,7 @@ export interface LoanPolicy {
   interestBps: number;
   collectorCommissionBps: number;
   partnersBps: number;
+  minInstallments: number;
   maxInstallments: number;
   biweeklyMinPrincipal: number;
   minPrincipal: number;
@@ -12,11 +13,12 @@ export interface LoanPolicy {
   biweeklyIntervalDays: number;
 }
 
-/** Política inicial del negocio (versión 1 en la base de datos). */
+/** Política vigente del negocio: 20 % único, solo 4 o 5 cuotas. */
 export const DEFAULT_POLICY: LoanPolicy = {
   interestBps: 2000,
   collectorCommissionBps: 500,
   partnersBps: 1500,
+  minInstallments: 4,
   maxInstallments: 5,
   biweeklyMinPrincipal: 500_000,
   minPrincipal: 1,
@@ -33,6 +35,7 @@ export function policyFromRow(row: Record<string, unknown>): LoanPolicy {
     interestBps: Number(row.interest_bps),
     collectorCommissionBps: Number(row.collector_commission_bps ?? 0),
     partnersBps: Number(row.partners_bps ?? 0),
+    minInstallments: Number(row.min_installments ?? 1),
     maxInstallments: Number(row.max_installments),
     biweeklyMinPrincipal: Number(row.biweekly_min_principal),
     minPrincipal: Number(row.min_principal),
@@ -60,10 +63,15 @@ export function validateTerms(principal: number, installments: number, frequency
   if (policy.maxPrincipal !== null && principal > policy.maxPrincipal) {
     throw new TermsError(`El capital máximo es ${policy.maxPrincipal}`);
   }
-  if (!Number.isInteger(installments) || installments < 1 || installments > policy.maxInstallments) {
-    throw new TermsError(`El número de cuotas debe estar entre 1 y ${policy.maxInstallments}`);
+  if (!Number.isInteger(installments) || installments < policy.minInstallments || installments > policy.maxInstallments) {
+    throw new TermsError(`El número de cuotas debe estar entre ${policy.minInstallments} y ${policy.maxInstallments}`);
   }
   if (!allowedFrequencies(principal, policy).includes(frequency)) {
     throw new TermsError(`Para importes inferiores a ${policy.biweeklyMinPrincipal} solo se permite la modalidad semanal`);
   }
+}
+
+/** Opciones de número de cuotas permitidas por la política (p. ej. [4, 5]). */
+export function installmentOptions(policy: LoanPolicy = DEFAULT_POLICY): number[] {
+  return Array.from({ length: policy.maxInstallments - policy.minInstallments + 1 }, (_, i) => policy.minInstallments + i);
 }

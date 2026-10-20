@@ -1,15 +1,15 @@
-import { Simulator } from '@/components/simulator';
-import { PageHeader } from '@/components/ui';
+import { LoanCalculator } from '@/components/loan-calculator';
 import { todayBogota } from '@/lib/finance';
-import { requestLoan, saveSimulation } from '@/app/simulador/actions';
+import { requestLoan } from '@/app/simulador/actions';
 
-export const metadata = { title: 'Simular nuevo préstamo' };
+export const metadata = { title: 'Simular préstamo' };
 
 export default function CustomerSimulatorPage() {
   return (
     <>
-      <PageHeader title="Simular nuevo préstamo" subtitle="Compare modalidades y cuotas. Si le conviene, envíe la solicitud: la administración la revisará." />
-      <Simulator today={todayBogota()} saveAction={saveSimulation} applyAction={requestLoan} canApply />
+      <h1 className="text-2xl font-bold">Simular préstamo</h1>
+      <p className="mb-4 text-sm text-slate-500">Vea cuánto pagaría. Simular no le crea ninguna deuda.</p>
+      <LoanCalculator today={todayBogota()} action={requestLoan} submitLabel="Pedir este préstamo" />
     </>
   );
 }

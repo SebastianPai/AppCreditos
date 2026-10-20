@@ -1,9 +1,9 @@
 // Genera los iconos PWA en public/icons sin dependencias externas.
-// Diseño: barras blancas ascendentes sobre fondo verde de marca.
+// Diseño: barras blancas ascendentes sobre fondo gris oscuro de marca.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
-const BRAND = [5, 150, 105];
+const BRAND = [51, 65, 85];
 const WHITE = [255, 255, 255];
 
 function crc32(buf) {

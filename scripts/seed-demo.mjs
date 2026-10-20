@@ -97,7 +97,7 @@ try {
   // 4. Préstamos: (cliente, cobrador, capital, cuotas, modalidad, días desde el desembolso, pagos [días, valor])
   const loans = [
     [0, ids.collector, 600_000, 4, 'weekly', -15, [[-8, 180_000], [-1, 100_000]]],
-    [1, ids.collector, 300_000, 3, 'weekly', -22, [[-15, 120_000], [-8, 120_000], [-1, 120_000]]],
+    [1, ids.collector, 300_000, 4, 'weekly', -29, [[-22, 90_000], [-15, 90_000], [-8, 90_000], [-1, 90_000]]],
     [2, ids.collector, 800_000, 5, 'biweekly', -35, [[-20, 192_000]]],
     [3, ids.collector2, 500_000, 5, 'weekly', -10, [[-3, 120_000]]],
     [4, ids.collector2, 1_000_000, 4, 'biweekly', 0, []],

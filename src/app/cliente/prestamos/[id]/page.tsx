@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { InstallmentsTable } from '@/components/installments-table';
 import { Card, KeyValue, LinkButton, PageHeader, StatusBadge } from '@/components/ui';
-import { formatCOP, formatDate, FREQUENCY_LABEL, type Frequency } from '@/lib/finance';
+import { formatCOP, formatDate } from '@/lib/finance';
 import { LOAN_STATUS, PAYMENT_METHOD } from '@/lib/labels';
 import { userDb } from '@/lib/auth';
 
@@ -20,24 +20,23 @@ export default async function CustomerLoanPage({ params }: { params: Promise<{ i
 
   return (
     <>
-      <Link href="/cliente" className="mb-3 inline-block text-sm text-brand-700">← Mis préstamos</Link>
+      <Link href="/cliente" className="mb-3 inline-block text-sm text-brand-700">← Inicio</Link>
       <PageHeader title={`Préstamo ${loan.code}`} subtitle={<StatusBadge map={LOAN_STATUS} value={loan.status} />} actions={loan.status === 'active' ? <LinkButton href={`/cliente/pagar?prestamo=${loan.id}`}>Pagar</LinkButton> : undefined} />
       <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
-        <Card title="Condiciones">
+        <Card title="Resumen">
           <KeyValue
             items={[
-              ['Capital', formatCOP(loan.principal)],
-              ['Interés total', `${formatCOP(loan.interest_total)} (${loan.interest_bps / 100} %)`],
+              ['Le prestaron', formatCOP(loan.principal)],
               ['Total a pagar', formatCOP(loan.total_amount)],
-              ['Cuotas', `${loan.installments_count} · ${FREQUENCY_LABEL[loan.frequency as Frequency]}`],
-              ['Pagado', formatCOP(balance?.paid_total)],
-              ['Saldo pendiente', formatCOP(balance?.outstanding)],
-              ['Próximo vencimiento', formatDate(balance?.next_due_date)],
+              ['Cuotas', `${loan.installments_count} · ${loan.frequency === 'weekly' ? 'cada semana' : 'cada 15 días'}`],
+              ['Ya pagó', formatCOP(balance?.paid_total)],
+              ['Debe', formatCOP(balance?.outstanding)],
+              ['Próximo pago', formatDate(balance?.next_due_date)],
             ]}
           />
         </Card>
         <Card title="Cuotas">
-          <InstallmentsTable rows={installments ?? []} />
+          <InstallmentsTable rows={installments ?? []} showSplit={false} />
         </Card>
       </div>
       <Card title="Pagos registrados" className="mt-4">

@@ -27,7 +27,7 @@ export function SettlementReportView({ r }: { r: SettlementReport }) {
               ['± Ajustes', formatCOP(r.adjustments)],
               ['= Resultado del periodo', formatCOP(r.period_result)],
               ['Pérdida arrastrada', formatCOP(r.prior_loss_carried)],
-              ['Ganancia neta distribuible', <strong key="n" className="text-emerald-700">{formatCOP(r.net_distributable)}</strong>],
+              ['Ganancia neta distribuible', <strong key="n" className="text-slate-800">{formatCOP(r.net_distributable)}</strong>],
               ['Pérdida que pasa al siguiente periodo', formatCOP(r.loss_carried_forward)],
             ]}
           />

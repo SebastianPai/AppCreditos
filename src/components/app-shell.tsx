@@ -20,11 +20,10 @@ const NAV: Record<SessionProfile['role'], NavItem[]> = {
     { href: '/admin/auditoria', label: 'Auditoría', icon: 'eye' },
   ],
   collector: [
-    { href: '/cobrador', label: 'Hoy', icon: 'home' },
+    { href: '/cobrador', label: 'Inicio', icon: 'home' },
+    { href: '/cobrador/clientes/nuevo', label: 'Nuevo cliente', icon: 'plus' },
+    { href: '/cobrador/prestamos/nuevo', label: 'Préstamo', icon: 'cash' },
     { href: '/cobrador/clientes', label: 'Clientes', icon: 'users' },
-    { href: '/cobrador/informe', label: 'Informe', icon: 'chart' },
-    { href: '/cobrador/comisiones', label: 'Comisiones', icon: 'cash' },
-    { href: '/notificaciones', label: 'Avisos', icon: 'bell' },
   ],
   partner: [
     { href: '/socio', label: 'Resumen', icon: 'home' },
@@ -32,9 +31,9 @@ const NAV: Record<SessionProfile['role'], NavItem[]> = {
   ],
   customer: [
     { href: '/cliente', label: 'Inicio', icon: 'home' },
+    { href: '/cliente/puntaje', label: 'Mi puntaje', icon: 'star' },
     { href: '/cliente/simular', label: 'Simular', icon: 'calc' },
     { href: '/cliente/pagar', label: 'Pagar', icon: 'qr' },
-    { href: '/notificaciones', label: 'Avisos', icon: 'bell' },
   ],
 };
 

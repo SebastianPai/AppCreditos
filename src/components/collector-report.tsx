@@ -80,7 +80,7 @@ export function CollectorReportView({ r }: { r: CollectorReport }) {
           <KeyValue
             items={[
               ['Dinero esperado (cuotas que vencían)', formatCOP(r.expected)],
-              ['Diferencia recibido − esperado', <span key="d" className={r.difference < 0 ? 'text-red-700' : 'text-emerald-700'}>{formatCOP(r.difference)}</span>],
+              ['Diferencia recibido − esperado', <span key="d" className={r.difference < 0 ? 'text-red-700' : 'text-slate-800'}>{formatCOP(r.difference)}</span>],
               ['Cuotas que continúan pendientes', `${r.pending_installments} · ${formatCOP(r.pending_amount)}`],
               ['Comisión devengada', formatCOP(r.commission_accrued)],
               ['Comisión pagada', formatCOP(r.commission_paid)],

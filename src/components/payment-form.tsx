@@ -126,7 +126,7 @@ export function PaymentForm({
       </button>
       {!state.ok && <p className="field-error" role="alert">{state.error}</p>}
       {state.ok && state.message && (
-        <p className="text-sm text-emerald-700" role="status">
+        <p className="text-sm text-slate-800" role="status">
           {state.message}{' '}
           {state.data && <Link href={`/comprobantes/${state.data.payment_id}`} className="underline">Ver comprobante</Link>}
         </p>

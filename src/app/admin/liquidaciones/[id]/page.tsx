@@ -65,7 +65,7 @@ export default async function SettlementDetailPage({ params }: { params: Promise
               <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <span>{d.display_name} · neto <strong>{formatCOP(d.net_amount)}</strong> (bruto {formatCOP(d.gross_amount)}, anticipos {formatCOP(d.advances_deducted)})</span>
                 {d.paid_at ? (
-                  <span className="text-emerald-700">Pagada {formatDateTime(d.paid_at)}</span>
+                  <span className="text-slate-800">Pagada {formatDateTime(d.paid_at)}</span>
                 ) : (
                   <ActionForm action={payDistribution} submitLabel="Registrar pago" className="no-print inline-block" confirmText="Entregué el dinero al socio.">
                     <input type="hidden" name="distribution_id" value={d.id} />

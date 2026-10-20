@@ -108,7 +108,7 @@ describe('Cumplimiento normativo', () => {
 
 describe('Simulación y solicitudes', () => {
   it('el cálculo SQL coincide exactamente con la librería TypeScript', async () => {
-    for (const [p, k, f] of [[600_000, 4, 'weekly'], [600_000, 5, 'biweekly'], [123_457, 3, 'weekly'], [999_999, 5, 'biweekly']] as const) {
+    for (const [p, k, f] of [[600_000, 4, 'weekly'], [600_000, 5, 'biweekly'], [123_457, 4, 'weekly'], [999_999, 5, 'biweekly']] as const) {
       const sim = await db.rpc<Record<string, any>>(A(), 'simulate_loan', {
         p_principal: p, p_installments: k, p_frequency: f, p_start_date: isoDaysFromToday(1),
       });
@@ -132,12 +132,12 @@ describe('Simulación y solicitudes', () => {
     expect(n(sim.total_amount)).toBe(720_000);
     expect(sim.collector_commission_total).toBeUndefined();
     // Sin sesión no se puede simular.
-    await expect(db.rpc(anon, 'simulate_loan', { p_principal: 300_000, p_installments: 2, p_frequency: 'weekly', p_start_date: null })).rejects.toThrow(/FORBIDDEN/);
+    await expect(db.rpc(anon, 'simulate_loan', { p_principal: 300_000, p_installments: 4, p_frequency: 'weekly', p_start_date: null })).rejects.toThrow(/FORBIDDEN/);
     expect(await count('loans')).toBe(loansBefore);
     expect(await count('loan_installments')).toBe(instBefore);
     expect(await db.rpc(A(), 'capital_summary')).toEqual(capBefore);
     await expect(
-      db.rpc(CA(), 'simulate_loan', { p_principal: 300_000, p_installments: 2, p_frequency: 'biweekly', p_start_date: null }),
+      db.rpc(CA(), 'simulate_loan', { p_principal: 300_000, p_installments: 4, p_frequency: 'biweekly', p_start_date: null }),
     ).rejects.toThrow(/solo se permite la modalidad semanal/);
     // El informe de la simulación del cliente A no es visible para el cliente B.
     await expect(db.rpc(CB(), 'get_simulation', { p_id: sim.id })).rejects.toThrow(/FORBIDDEN/);
@@ -164,7 +164,7 @@ describe('Simulación y solicitudes', () => {
     ).rejects.toThrow(/FORBIDDEN/);
     await expect(
       db.rpc(CA(), 'create_application', {
-        p_principal: 100_000, p_installments: 1, p_frequency: 'weekly', p_start_date: isoDaysFromToday(0),
+        p_principal: 100_000, p_installments: 4, p_frequency: 'weekly', p_start_date: isoDaysFromToday(0),
         p_simulation_id: null, p_customer_id: null, p_message: null,
       }),
     ).rejects.toThrow(/OPEN_APPLICATION/);
@@ -227,7 +227,7 @@ describe('Pagos', () => {
   });
 
   it('14. un cliente no puede acceder a datos de otro cliente', async () => {
-    const loanB = await activeLoan(s.customerB, s.collector2, 300_000, 3);
+    const loanB = await activeLoan(s.customerB, s.collector2, 300_000, 4);
     const paymentB = await pay(C2(), loanB, 100_000);
     for (const sql of [
       ['select * from public.customers where id = $1', s.customerB],

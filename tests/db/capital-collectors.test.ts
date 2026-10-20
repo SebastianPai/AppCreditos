@@ -45,11 +45,11 @@ describe('19. Capital disponible', () => {
 
   it('no se puede desembolsar más capital del disponible', async () => {
     const app = await db.rpc<string>(A(), 'create_application', {
-      p_principal: 500_000, p_installments: 2, p_frequency: 'weekly', p_start_date: isoDaysFromToday(0),
+      p_principal: 500_000, p_installments: 4, p_frequency: 'weekly', p_start_date: isoDaysFromToday(0),
       p_simulation_id: null, p_customer_id: s.customerB, p_message: null,
     });
     const big = await db.rpc<string>(A(), 'approve_application', {
-      p_application_id: app, p_collector_id: s.collector2, p_principal: 500_000, p_installments: 2, p_frequency: 'weekly', p_start_date: isoDaysFromToday(0),
+      p_application_id: app, p_collector_id: s.collector2, p_principal: 500_000, p_installments: 4, p_frequency: 'weekly', p_start_date: isoDaysFromToday(0),
     });
     await expect(db.rpc(A(), 'disburse_loan', { p_loan_id: big, p_disbursed_on: null })).rejects.toThrow(/INSUFFICIENT_CAPITAL/);
     await db.rpc(A(), 'cancel_loan', { p_loan_id: big, p_reason: 'Sin capital' });
@@ -146,7 +146,50 @@ describe('Registro de clientes por cobradores', () => {
     await db.rpc(A(), 'update_setting', { p_key: 'operations', p_value: { collectors_can_create_customers: false } });
     await expect(newCustomer(C1(), '12121212')).rejects.toThrow(/desactivó/);
     await expect(db.rpc(C1(), 'update_setting', { p_key: 'operations', p_value: { collectors_can_create_customers: true } })).rejects.toThrow(/FORBIDDEN/);
-    await db.rpc(A(), 'update_setting', { p_key: 'operations', p_value: { collectors_can_create_customers: true } });
+    await db.rpc(A(), 'update_setting', { p_key: 'operations', p_value: { collectors_can_create_customers: true, collectors_can_approve_loans: true } });
     expect(await newCustomer(C1(), '12121212')).toBeTruthy();
+  });
+});
+
+describe('Créditos simples creados por el cobrador', () => {
+  const terms = (n: number) => ({ p_principal: 400_000, p_installments: n, p_frequency: 'weekly', p_start_date: isoDaysFromToday(0) });
+
+  it('solo se permiten 4 o 5 cuotas', async () => {
+    for (const n of [1, 2, 3, 6]) {
+      await expect(db.rpc(C1(), 'create_application', { ...terms(n), p_simulation_id: null, p_customer_id: s.customerA, p_message: null })).rejects.toThrow(/entre 4 y 5/);
+    }
+  });
+
+  it('el cobrador crea y aprueba el crédito de su cliente; el crédito queda a su cargo', async () => {
+    const app = await db.rpc<string>(C1(), 'create_application', { ...terms(4), p_simulation_id: null, p_customer_id: s.customerA, p_message: null });
+    const loan = await db.rpc<string>(C1(), 'approve_application', { p_application_id: app, p_collector_id: s.collector2, ...terms(4) });
+    const l = (await db.owner<any>('select collector_id, approved_by, total_amount, status from public.loans where id = $1', [loan]))[0];
+    expect(l).toMatchObject({ collector_id: s.collector, approved_by: s.collector, status: 'approved' });
+    expect(Number(l.total_amount)).toBe(480_000);
+  });
+
+  it('el cobrador rechaza solicitudes de sus clientes, pero no las de otros cobradores', async () => {
+    const appB = await db.rpc<string>(A(), 'create_application', { ...terms(5), p_simulation_id: null, p_customer_id: s.customerB, p_message: null });
+    await expect(db.rpc(C1(), 'review_application', { p_application_id: appB, p_action: 'reject', p_notes: 'No' })).rejects.toThrow(/FORBIDDEN/);
+    await expect(db.rpc(C1(), 'approve_application', { p_application_id: appB, p_collector_id: s.collector, ...terms(5) })).rejects.toThrow(/FORBIDDEN/);
+    await db.rpc(user(s.collector2), 'review_application', { p_application_id: appB, p_action: 'reject', p_notes: 'Sin capacidad de pago' });
+    expect((await db.owner<any>('select status, decided_by from public.loan_applications where id = $1', [appB]))[0]).toEqual({ status: 'rejected', decided_by: s.collector2 });
+  });
+
+  it('préstamo directo: el cobrador lo crea y queda activo desde hoy, solo para sus clientes', async () => {
+    const loan = await db.rpc<string>(C1(), 'create_simple_loan', { p_customer_id: s.customerA, p_principal: 600_000, p_installments: 4, p_frequency: 'weekly' });
+    const l = (await db.owner<any>('select collector_id, status, total_amount, disbursed_at from public.loans where id = $1', [loan]))[0];
+    expect(l).toMatchObject({ collector_id: s.collector, status: 'active' });
+    expect(Number(l.total_amount)).toBe(720_000);
+    expect(l.disbursed_at).toBeTruthy();
+    const cuotas = await db.owner<any>('select total_amount from public.loan_installments where loan_id = $1 order by number', [loan]);
+    expect(cuotas.map((c: any) => Number(c.total_amount))).toEqual([180_000, 180_000, 180_000, 180_000]);
+    await expect(db.rpc(C1(), 'create_simple_loan', { p_customer_id: s.customerB, p_principal: 600_000, p_installments: 4, p_frequency: 'weekly' })).rejects.toThrow(/FORBIDDEN/);
+  });
+
+  it('el administrador puede quitar al cobrador la facultad de aprobar', async () => {
+    await db.rpc(A(), 'update_setting', { p_key: 'operations', p_value: { collectors_can_create_customers: true, collectors_can_approve_loans: false } });
+    await expect(db.rpc(C1(), 'create_application', { ...terms(4), p_simulation_id: null, p_customer_id: s.customerA, p_message: null })).rejects.toThrow(/FORBIDDEN/);
+    await db.rpc(A(), 'update_setting', { p_key: 'operations', p_value: { collectors_can_create_customers: true, collectors_can_approve_loans: true } });
   });
 });

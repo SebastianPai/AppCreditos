@@ -151,6 +151,10 @@ export default async function SettingsPage() {
               <input type="checkbox" name="collectors_can_create_customers" defaultChecked={get<{ collectors_can_create_customers?: boolean }>('operations')?.collectors_can_create_customers ?? true} className="mt-0.5 size-5" />
               <span>Los cobradores pueden registrar clientes nuevos (con cédula obligatoria) y crearles acceso a la app.</span>
             </label>
+            <label className="flex items-start gap-3 text-sm">
+              <input type="checkbox" name="collectors_can_approve_loans" defaultChecked={get<{ collectors_can_approve_loans?: boolean }>('operations')?.collectors_can_approve_loans ?? true} className="mt-0.5 size-5" />
+              <span>Los cobradores pueden crear préstamos a sus clientes (quedan activos de inmediato).</span>
+            </label>
           </ActionForm>
         </Card>
 

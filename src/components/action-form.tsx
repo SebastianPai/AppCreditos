@@ -56,7 +56,7 @@ export function ActionForm({
         </p>
       )}
       {state.ok && 'message' in state && state.message && (
-        <p className="text-sm text-emerald-700" role="status">
+        <p className="text-sm text-slate-800" role="status">
           {state.message}
         </p>
       )}

@@ -87,7 +87,7 @@ export function CustomerForm({
       {e.data_consent && <p className="field-error">{e.data_consent.message}</p>}
       <button className="btn-primary" disabled={pending}>{pending ? 'Guardando…' : 'Crear cliente'}</button>
       {!state.ok && <p className="field-error" role="alert">{state.error}</p>}
-      {state.ok && 'message' in state && state.message && <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{state.message}</p>}
+      {state.ok && 'message' in state && state.message && <p className="rounded-xl bg-slate-100 p-3 text-sm text-slate-800" role="status">{state.message}</p>}
     </form>
   );
 }

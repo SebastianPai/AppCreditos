@@ -3,95 +3,117 @@ import { notFound } from 'next/navigation';
 import { ActionForm } from '@/components/action-form';
 import { InstallmentsTable } from '@/components/installments-table';
 import { PaymentForm } from '@/components/payment-form';
-import { Card, KeyValue, PageHeader, StatusBadge } from '@/components/ui';
-import { formatCOP, formatDate, todayBogota, FREQUENCY_LABEL, type Frequency } from '@/lib/finance';
-import { LOAN_STATUS, PAYMENT_METHOD } from '@/lib/labels';
+import { LinkButton, MoreSection, Notice } from '@/components/ui';
+import { dueStatus, formatCOP, formatDate, todayBogota } from '@/lib/finance';
 import { userDb } from '@/lib/auth';
+import { creditScore, SCORE_SQL, type ScoreInstallment } from '@/lib/score';
 import { collectorCreateAccess, registerPayment, requestReversal } from '../../actions';
 
-export default async function CollectorCustomerPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CollectorCustomerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ creado?: string }> }) {
   const { id } = await params;
-  const db = await userDb();
+  const { creado } = await searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
-  const customer = await db.one('select * from public.v_customers where id = $1', [id]);
+  const db = await userDb();
+  const customer = await db.one('select c.*, v.document_masked from public.customers c join public.v_customers v on v.id = c.id where c.id = $1', [id]);
   if (!customer) notFound();
-  const [loans, installments, payments, ops, doc] = await Promise.all([
-    db.query(`select * from public.v_loan_balances where customer_id = $1 and status in ('active', 'paid') order by created_at desc`, [id]),
+  const [loans, installments, payments, scoreRows] = await Promise.all([
+    db.query(`select * from public.v_loan_balances where customer_id = $1 and status = 'active' order by created_at desc`, [id]),
     db.query<any>('select * from public.v_installments where customer_id = $1 order by number', [id]),
-    db.query('select id, loan_id, receipt_number, amount, method, received_on, status, public.staff_name(received_by) as received_by_name from public.payments where customer_id = $1 order by received_at desc limit 30', [id]),
-    db.one<{ value: { collectors_can_create_customers?: boolean } }>(`select value from public.app_settings where key = 'operations'`),
-    db.one<{ document_number: string }>('select document_number from public.customers where id = $1', [id]),
+    db.query('select id, receipt_number, amount, received_on, status from public.payments where customer_id = $1 order by received_at desc limit 20', [id]),
+    db.query<ScoreInstallment>(SCORE_SQL, [id]),
   ]);
-  const canCreateAccess = !customer.profile_id && (ops?.value.collectors_can_create_customers ?? false);
   const today = todayBogota();
+  const score = creditScore(scoreRows ?? [], today);
 
   return (
     <>
-      <Link href="/cobrador/clientes" className="mb-3 inline-block text-sm text-brand-700">← Mis clientes</Link>
-      <PageHeader title={customer.full_name} subtitle={`${customer.code} · ${customer.document_type} ${customer.document_masked}`} actions={<a href={`tel:${customer.phone.replace(/\s/g, '')}`} className="btn-secondary">Llamar {customer.phone}</a>} />
+      <Link href="/cobrador/clientes" className="mb-3 inline-block text-sm text-slate-600">← Clientes</Link>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-bold">{customer.full_name}</h1>
+          <p className="text-sm text-slate-500">CC {customer.document_masked} · Puntaje {score.score}</p>
+        </div>
+        <a href={`tel:${customer.phone.replace(/\s/g, '')}`} className="btn-secondary btn-sm shrink-0">Llamar</a>
+      </div>
+      {creado === '1' && <div className="mb-4"><Notice tone="neutral">Préstamo creado. La primera cuota aparece abajo.</Notice></div>}
 
-      {canCreateAccess && (
-        <Card className="mb-4">
-          <ActionForm action={collectorCreateAccess} submitLabel="Crear acceso a la app" variant="secondary">
-            <input type="hidden" name="customer_id" value={customer.id} />
-            <input type="hidden" name="full_name" value={customer.full_name} />
-            <input type="hidden" name="phone" value={customer.phone} />
-            <input type="hidden" name="document" value={doc?.document_number ?? ''} />
-            <p className="text-sm text-slate-600">El cliente aún no tiene acceso. Ingresará con su cédula y una contraseña temporal.</p>
-          </ActionForm>
-        </Card>
+      {!loans?.length && (
+        <div className="rounded-2xl border border-dashed border-slate-300 p-5 text-center">
+          <p className="mb-3 text-sm text-slate-500">No tiene préstamo activo.</p>
+          <LinkButton href={`/cobrador/prestamos/nuevo?cliente=${id}`}>Crear préstamo</LinkButton>
+        </div>
       )}
 
       {(loans ?? []).map((l) => {
         const rows = (installments ?? []).filter((i) => i.loan_id === l.id);
         const next = rows.find((r) => r.outstanding > 0);
+        const st = next ? dueStatus(next.due_date, today) : null;
         return (
-          <Card key={l.id} title={`Préstamo ${l.code}`} action={<StatusBadge map={LOAN_STATUS} value={l.status} />} className="mb-4">
-            <KeyValue
-              items={[
-                ['Condiciones', `${formatCOP(l.principal)} · ${l.installments_count} cuotas ${FREQUENCY_LABEL[l.frequency as Frequency].toLowerCase()}es`],
-                ['Total contractual', formatCOP(l.total_amount)],
-                ['Pagado', formatCOP(l.paid_total)],
-                ['Saldo pendiente', formatCOP(l.outstanding)],
-                ['Vencido', formatCOP(l.overdue_amount)],
-              ]}
-            />
-            <div className="mt-3"><InstallmentsTable rows={rows} showSplit={false} /></div>
-            {l.status === 'active' && (
-              <div id="pago" className="mt-4 rounded-xl border border-brand-100 bg-brand-50/50 p-3">
-                <h3 className="mb-2 font-semibold">Registrar pago recibido</h3>
-                <PaymentForm loanId={l.id} outstanding={l.outstanding} nextDue={next?.outstanding ?? 0} action={registerPayment} today={today} />
+          <section key={l.id} className="mb-4 rounded-2xl border border-slate-200 p-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-slate-500">Debe</p>
+                <p className="text-2xl font-bold tabular-nums">{formatCOP(l.outstanding)}</p>
               </div>
+              <div className="text-right">
+                <p className="text-xs text-slate-500">Cuota {next?.number ?? '—'} de {l.installments_count}</p>
+                <p className="text-2xl font-bold tabular-nums">{next ? formatCOP(next.outstanding) : '—'}</p>
+              </div>
+            </div>
+            {next && st && (
+              <p className={`mt-2 rounded-lg px-3 py-2 text-sm ${st.days < 0 ? 'bg-red-50 font-semibold text-red-800' : 'bg-slate-100 text-slate-700'}`}>
+                Paga el {formatDate(next.due_date)} · {st.text}
+              </p>
             )}
-          </Card>
+            <div id="pago" className="mt-4">
+              <h2 className="mb-2 font-semibold">Registrar pago</h2>
+              <PaymentForm loanId={l.id} outstanding={l.outstanding} nextDue={next?.outstanding ?? 0} action={registerPayment} today={today} />
+            </div>
+            <MoreSection label="Ver todas las cuotas" className="mt-3">
+              <InstallmentsTable rows={rows} showSplit={false} />
+            </MoreSection>
+          </section>
         );
       })}
 
-      <Card title="Historial de pagos">
-        <ul className="divide-y divide-slate-100 text-sm">
-          {(payments ?? []).map((p) => (
-            <li key={p.id} className="py-2">
-              <div className="flex items-center justify-between gap-2">
-                <span>
-                  N.º {p.receipt_number} · {formatDate(p.received_on)} · {PAYMENT_METHOD[p.method]} · registró {p.received_by_name ?? 'pasarela'}
-                  {p.status === 'reversed' && <span className="ml-1 text-red-700">(reversado)</span>}
-                </span>
-                <Link href={`/comprobantes/${p.id}`} className="font-semibold text-brand-700 tabular-nums">{formatCOP(p.amount)}</Link>
-              </div>
-              {p.status === 'confirmed' && p.received_on === today && (
-                <details className="mt-1">
-                  <summary className="cursor-pointer text-xs text-slate-500">¿Error en este pago? Solicitar corrección</summary>
-                  <ActionForm action={requestReversal} submitLabel="Solicitar corrección" variant="secondary" className="mt-2 space-y-2">
-                    <input type="hidden" name="payment_id" value={p.id} />
-                    <input name="reason" required minLength={5} maxLength={300} className="input" placeholder="Motivo de la corrección" />
-                  </ActionForm>
-                </details>
-              )}
-            </li>
-          ))}
-          {!payments?.length && <li className="py-2 text-slate-500">Sin pagos.</li>}
-        </ul>
-      </Card>
+      <MoreSection label="Ver más (pagos y datos)">
+        <div className="rounded-2xl border border-slate-200 p-4 text-sm">
+          <p><span className="text-slate-500">Teléfono:</span> {customer.phone}</p>
+          {customer.address && <p><span className="text-slate-500">Dirección:</span> {customer.address}</p>}
+          <p><span className="text-slate-500">Usuario de la app:</span> {customer.profile_id ? customer.document_number : 'sin acceso'}</p>
+          {!customer.profile_id && (
+            <ActionForm action={collectorCreateAccess} submitLabel="Crear acceso a la app" variant="secondary" className="mt-3 space-y-2">
+              <input type="hidden" name="customer_id" value={customer.id} />
+              <input type="hidden" name="full_name" value={customer.full_name} />
+              <input type="hidden" name="phone" value={customer.phone} />
+              <input type="hidden" name="document" value={customer.document_number} />
+            </ActionForm>
+          )}
+        </div>
+        <div className="rounded-2xl border border-slate-200 p-4">
+          <h2 className="mb-2 font-semibold">Pagos</h2>
+          <ul className="divide-y divide-slate-100 text-sm">
+            {(payments ?? []).map((p) => (
+              <li key={p.id} className="py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span>{formatDate(p.received_on)}{p.status === 'reversed' && <span className="ml-1 text-red-700">(anulado)</span>}</span>
+                  <Link href={`/comprobantes/${p.id}`} className="font-semibold tabular-nums underline">{formatCOP(p.amount)}</Link>
+                </div>
+                {p.status === 'confirmed' && p.received_on === today && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs text-slate-500">¿Se equivocó? Pedir corrección</summary>
+                    <ActionForm action={requestReversal} submitLabel="Pedir corrección" variant="secondary" className="mt-2 space-y-2">
+                      <input type="hidden" name="payment_id" value={p.id} />
+                      <input name="reason" required minLength={5} maxLength={300} className="input" placeholder="Motivo" />
+                    </ActionForm>
+                  </details>
+                )}
+              </li>
+            ))}
+            {!payments?.length && <li className="py-2 text-slate-500">Sin pagos.</li>}
+          </ul>
+        </div>
+      </MoreSection>
     </>
   );
 }

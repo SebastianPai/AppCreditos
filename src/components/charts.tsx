@@ -15,7 +15,7 @@ export function DailyCollectionsChart({ data }: { data: { date: string; amount: 
           <YAxis tickFormatter={compact} tick={{ fontSize: 11 }} width={48} />
           <Tooltip formatter={(v) => cop(Number(v))} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="principal" name="Capital recuperado" stackId="a" fill="#059669" />
+          <Bar dataKey="principal" name="Capital recuperado" stackId="a" fill="#334155" />
           <Bar dataKey="interest" name="Interés" stackId="a" fill="#f59e0b" radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
@@ -33,8 +33,8 @@ export function MonthlyChart({ data }: { data: { month: string; disbursed: numbe
           <YAxis tickFormatter={compact} tick={{ fontSize: 11 }} width={48} />
           <Tooltip formatter={(v) => cop(Number(v))} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="disbursed" name="Desembolsado" fill="#0ea5e9" />
-          <Bar dataKey="collected" name="Recaudado" fill="#059669" />
+          <Bar dataKey="disbursed" name="Desembolsado" fill="#94a3b8" />
+          <Bar dataKey="collected" name="Recaudado" fill="#334155" />
           <Bar dataKey="interest" name="Interés" fill="#f59e0b" />
         </BarChart>
       </ResponsiveContainer>

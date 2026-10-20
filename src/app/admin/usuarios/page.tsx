@@ -26,7 +26,7 @@ export default async function UsersPage() {
         <Card title="Crear usuario">
           <ActionForm action={createUser} submitLabel="Crear cuenta" resetOnSuccess>
             <input name="full_name" required placeholder="Nombre completo" className="input" aria-label="Nombre" />
-            <input name="email" type="email" required placeholder="Correo" className="input" aria-label="Correo" />
+            <input name="email" type="text" autoCapitalize="none" required placeholder="Usuario (ej. tatiana.rodriguez) o correo" className="input" aria-label="Usuario o correo" />
             <input name="phone" placeholder="Teléfono (opcional)" className="input" aria-label="Teléfono" />
             <select name="role" defaultValue="collector" className="input" aria-label="Rol">
               {(['collector', 'partner', 'admin', 'customer'] as AppRole[]).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
@@ -45,7 +45,7 @@ export default async function UsersPage() {
                 <details>
                   <summary className="flex cursor-pointer items-center justify-between gap-2">
                     <span><strong>{u.full_name}</strong> <span className="text-sm text-slate-500">· {ROLE_LABEL[u.role as AppRole]} · {u.email}</span></span>
-                    <span className={`text-xs ${u.active ? 'text-emerald-700' : 'text-red-700'}`}>{u.active ? 'Activo' : 'Inactivo'}</span>
+                    <span className={`text-xs ${u.active ? 'text-slate-800' : 'text-red-700'}`}>{u.active ? 'Activo' : 'Inactivo'}</span>
                   </summary>
                   <div className="mt-3 grid gap-4 sm:grid-cols-2">
                     <ActionForm action={updateProfile} submitLabel="Guardar">

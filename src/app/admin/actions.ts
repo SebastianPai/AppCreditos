@@ -71,7 +71,7 @@ export async function assignCollector(_: ActionResult, fd: FormData): Result {
 
 // ---------------------------------------------------------------- Usuarios
 const createUserSchema = z.object({
-  email: z.string().email('Correo no válido').optional().or(z.literal('')),
+  email: z.string().regex(/^([^@\s]+@[^@\s]+|[a-z0-9._-]{3,60})$/, 'Usuario o correo no válido (sin espacios)').optional().or(z.literal('')),
   full_name: z.string().trim().min(2, 'Nombre requerido').max(160),
   role: z.enum(['admin', 'collector', 'partner', 'customer']),
   phone: z.string().trim().regex(/^[0-9+ ]{7,20}$/, 'Teléfono no válido').optional().or(z.literal('')),
@@ -93,7 +93,7 @@ export async function createUser(_: ActionResult, fd: FormData): Result {
   });
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
   const { email, full_name, role, phone, customer_id } = parsed.data;
-  if (!email && role !== 'customer') return { ok: false, error: 'El correo es obligatorio para el personal.' };
+  if (!email && role !== 'customer') return { ok: false, error: 'El usuario o correo es obligatorio para el personal.' };
   const password = temporaryPassword();
   const db = await userDb();
   const { error } = await db.call('admin_create_user', {
@@ -345,7 +345,10 @@ export async function saveCompliance(_: ActionResult, fd: FormData): Result {
 export async function saveOperations(_: ActionResult, fd: FormData): Result {
   return rpc('update_setting', {
     p_key: 'operations',
-    p_value: { collectors_can_create_customers: fd.get('collectors_can_create_customers') === 'on' },
+    p_value: {
+      collectors_can_create_customers: fd.get('collectors_can_create_customers') === 'on',
+      collectors_can_approve_loans: fd.get('collectors_can_approve_loans') === 'on',
+    },
   }, 'Ajuste guardado (auditado).');
 }
 

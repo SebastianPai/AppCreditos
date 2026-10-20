@@ -5,7 +5,7 @@ import type { Tone } from '@/lib/labels';
 const TONES: Record<Tone, string> = {
   neutral: 'bg-slate-100 text-slate-700',
   info: 'bg-sky-100 text-sky-800',
-  success: 'bg-emerald-100 text-emerald-800',
+  success: 'bg-slate-200 text-slate-800',
   warning: 'bg-amber-100 text-amber-900',
   danger: 'bg-red-100 text-red-800',
 };
@@ -47,7 +47,7 @@ export function Card({ title, action, children, className = '' }: { title?: Reac
 
 /** Cifra con su definición contable desplegable. */
 export function Stat({ label, value, hint, definition, tone }: { label: string; value: ReactNode; hint?: ReactNode; definition?: string; tone?: Tone }) {
-  const color = tone === 'danger' ? 'text-red-700' : tone === 'success' ? 'text-emerald-700' : tone === 'warning' ? 'text-amber-700' : 'text-slate-900';
+  const color = tone === 'danger' ? 'text-red-700' : tone === 'success' ? 'text-slate-800' : tone === 'warning' ? 'text-amber-700' : 'text-slate-900';
   return (
     <div className="card !p-3.5">
       <div className="flex items-start justify-between gap-1">
@@ -102,7 +102,7 @@ export function Notice({ tone = 'info', title, children }: { tone?: Tone; title?
   const styles: Record<Tone, string> = {
     neutral: 'border-slate-200 bg-slate-50 text-slate-700',
     info: 'border-sky-200 bg-sky-50 text-sky-900',
-    success: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+    success: 'border-slate-300 bg-slate-100 text-slate-800',
     warning: 'border-amber-200 bg-amber-50 text-amber-900',
     danger: 'border-red-200 bg-red-50 text-red-900',
   };

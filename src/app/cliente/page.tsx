@@ -1,108 +1,78 @@
 import Link from 'next/link';
-import { Badge, Card, EmptyState, MoreSection, Notice, PageHeader, Stat, StatusBadge } from '@/components/ui';
-import { requireRole } from '@/lib/auth';
-import { dueStatus, formatCOP, formatDate, todayBogota } from '@/lib/finance';
-import { APPLICATION_STATUS, LOAN_STATUS, PAYMENT_METHOD } from '@/lib/labels';
-import { userDb } from '@/lib/auth';
+import { LinkButton, Notice } from '@/components/ui';
+import { requireRole, userDb } from '@/lib/auth';
+import { daysBetween, formatCOP, formatDate, todayBogota } from '@/lib/finance';
+import { Trend } from '@/components/score-trend';
+import { creditScore, SCORE_SQL, type ScoreInstallment } from '@/lib/score';
 
-export const metadata = { title: 'Mis préstamos' };
+export const metadata = { title: 'Mi préstamo' };
 
 export default async function CustomerHome() {
   const profile = await requireRole('customer');
   const db = await userDb();
-  const [customer, loans, payments, apps] = await Promise.all([
-    db.one('select * from public.v_customers limit 1'),
-    db.query(`select * from public.v_loan_balances where status in ('approved', 'active', 'paid') order by created_at desc`),
-    db.query('select id, receipt_number, amount, method, received_on, status from public.payments order by received_at desc limit 5'),
-    db.query(`select id, code, status, requested_principal, created_at from public.loan_applications
-               where status in ('pending', 'info_requested', 'counter_offered', 'accepted_by_customer')`),
+  const today = todayBogota();
+  const [customer, loans, installments, scoreRows] = await Promise.all([
+    db.one<{ id: string }>('select id from public.v_customers limit 1'),
+    db.query(`select * from public.v_loan_balances where status = 'active' order by created_at`),
+    db.query<{ loan_id: string; number: number; due_date: string; outstanding: number }>(
+      `select loan_id, number, due_date, outstanding from public.v_installments where loan_status = 'active' order by due_date`),
+    db.query<ScoreInstallment>(SCORE_SQL, [null]),
   ]);
+  const score = creditScore(scoreRows ?? [], today);
 
   return (
     <>
-      <PageHeader title={`Hola, ${profile.full_name.split(' ')[0]}`} subtitle={customer ? `Cliente ${customer.code}` : undefined} />
+      <h1 className="mb-4 text-2xl font-bold">Hola, {profile.full_name.split(' ')[0]}</h1>
+      {!customer && <Notice tone="warning">Su cuenta aún no está lista. Hable con su cobrador.</Notice>}
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2">
-        <Link href="/cliente/simular" className="btn-primary !min-h-16 text-base shadow-md">
-          <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M6 3h12v18H6zM9 7h6M9 12h1m4 0h1m-6 4h1m4 0h1" /></svg>
-          Simular nuevo préstamo
-        </Link>
-        <Link href="/cliente/pagar" className="btn-secondary !min-h-16 text-base">Pagar</Link>
-      </div>
-
-      {!customer && (
-        <Notice tone="warning">Su cuenta aún no está vinculada a una ficha de cliente. Contacte a la administración.</Notice>
+      {customer && !loans?.length && (
+        <div className="rounded-2xl border border-slate-200 p-5 text-center">
+          <p className="text-lg font-semibold">No tiene préstamo</p>
+          <p className="mt-1 text-sm text-slate-500">No debe nada.</p>
+          <LinkButton href="/cliente/simular" className="mt-4 w-full">Ver cuánto pagaría por un préstamo</LinkButton>
+        </div>
       )}
+
+      {(loans ?? []).map((l) => {
+        const rows = (installments ?? []).filter((i) => i.loan_id === l.id);
+        const next = rows.find((r) => r.outstanding > 0);
+        const days = next ? daysBetween(today, next.due_date) : 0;
+        const late = rows.filter((r) => r.outstanding > 0 && r.due_date < today);
+        return (
+          <section key={l.id} className="mb-4 rounded-2xl border border-slate-200 p-5">
+            <p className="text-sm text-slate-500">Usted debe</p>
+            <p className="text-4xl font-bold tabular-nums">{formatCOP(l.outstanding)}</p>
+            {next && (
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-slate-100 p-3">
+                  <p className="text-xs text-slate-500">Próxima cuota</p>
+                  <p className="text-lg font-bold tabular-nums">{formatCOP(next.outstanding)}</p>
+                  <p className="text-xs text-slate-600">{formatDate(next.due_date)}</p>
+                </div>
+                <div className={`rounded-xl p-3 ${days < 0 ? 'bg-red-50 text-red-800' : 'bg-slate-100'}`}>
+                  <p className="text-xs opacity-70">{days < 0 ? 'Va atrasado' : days === 0 ? 'Paga' : 'Le faltan'}</p>
+                  <p className="text-lg font-bold">{days < 0 ? `${-days} día${days === -1 ? '' : 's'}` : days === 0 ? 'Hoy' : `${days} día${days === 1 ? '' : 's'}`}</p>
+                  <p className="text-xs opacity-70">{days < 0 ? 'Póngase al día' : 'para pagar'}</p>
+                </div>
+              </div>
+            )}
+            {late.length > 1 && <p className="mt-2 text-sm font-semibold text-red-700">Tiene {late.length} cuotas atrasadas.</p>}
+            <p className="mt-3 text-sm text-slate-600">Ha pagado {l.installments_paid} de {l.installments_count} cuotas.</p>
+            <Link href={`/cliente/prestamos/${l.id}`} className="mt-3 block text-center text-sm font-medium underline">Ver más</Link>
+          </section>
+        );
+      })}
 
       {customer && (
-        <div className="grid grid-cols-2 gap-3">
-          <Stat label="Saldo pendiente" value={formatCOP(customer.outstanding)} />
-          <Stat label="Próxima cuota" value={customer.next_due_date ? formatDate(customer.next_due_date) : '—'}
-            hint={customer.next_due_date ? <Badge tone={dueStatus(customer.next_due_date, todayBogota()).tone}>{dueStatus(customer.next_due_date, todayBogota()).text}</Badge> : undefined} />
-        </div>
+        <Link href="/cliente/puntaje" className="flex items-center justify-between rounded-2xl border border-slate-200 p-5">
+          <span>
+            <span className="block text-sm text-slate-500">Mi puntaje</span>
+            <span className="text-3xl font-bold tabular-nums">{score.score}</span>
+            <span className="ml-2 text-sm text-slate-500">de 100 · {score.level.label}</span>
+          </span>
+          <Trend change={score.lastChange} />
+        </Link>
       )}
-
-      {apps && apps.length > 0 && (
-        <div className="mt-5 space-y-2">
-          {apps.map((a) => (
-            <Link key={a.id} href="/cliente/solicitudes" className="card flex items-center justify-between !p-3">
-              <span className="text-sm">
-                Solicitud {a.code} · {formatCOP(a.requested_principal)}
-              </span>
-              <StatusBadge map={APPLICATION_STATUS} value={a.status} />
-            </Link>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <Card title="Mis préstamos">
-          {!loans?.length ? (
-            <EmptyState>No tiene préstamos. Puede simular uno y enviar la solicitud.</EmptyState>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {loans.map((l) => (
-                <li key={l.id}>
-                  <Link href={`/cliente/prestamos/${l.id}`} className="flex items-center justify-between gap-3 py-3">
-                    <div>
-                      <p className="font-medium">{l.code} · {formatCOP(l.principal)}</p>
-                      <p className="text-xs text-slate-500">
-                        Pagado {formatCOP(l.paid_total)} de {formatCOP(l.total_amount)}
-                        {l.status === 'active' && l.next_due_date && ` · ${dueStatus(l.next_due_date, todayBogota()).text.toLowerCase()}`}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <StatusBadge map={LOAN_STATUS} value={l.status} />
-                      <p className="mt-1 text-sm font-semibold tabular-nums">{formatCOP(l.outstanding)}</p>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-        <MoreSection label="Ver últimos pagos">
-        <Card>
-          {!payments?.length ? (
-            <EmptyState>Aún no hay pagos registrados.</EmptyState>
-          ) : (
-            <ul className="divide-y divide-slate-100 text-sm">
-              {payments.map((p) => (
-                <li key={p.id} className="flex items-center justify-between py-2">
-                  <span>
-                    {formatDate(p.received_on)} · {PAYMENT_METHOD[p.method]}
-                    {p.status === 'reversed' && <span className="ml-1 text-red-700">(reversado)</span>}
-                  </span>
-                  <Link href={`/comprobantes/${p.id}`} className="font-semibold text-brand-700 tabular-nums">
-                    {formatCOP(p.amount)} ↗
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-        </MoreSection>
-      </div>
     </>
   );
 }
