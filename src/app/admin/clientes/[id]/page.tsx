@@ -121,8 +121,8 @@ export default async function AdminCustomerPage({ params }: { params: Promise<{ 
         </Card>
             </div>
 
-      <details className="mt-6 rounded-2xl border border-red-200 p-4">
-        <summary className="cursor-pointer text-sm font-semibold text-red-700">Eliminar cliente de prueba</summary>
+      <section id="eliminar" className="mt-6 scroll-mt-20 rounded-2xl border border-red-200 p-4">
+        <h2 className="text-sm font-semibold text-red-700">Eliminar cliente de prueba</h2>
         <p className="mt-2 text-sm text-slate-600">
           Borra este cliente y todo lo suyo: acceso a la app, préstamos, cuotas, pagos y comprobantes. Desaparece de pantallas,
           informes y saldos. No se puede deshacer. La eliminación queda anotada en Auditoría.
@@ -131,7 +131,7 @@ export default async function AdminCustomerPage({ params }: { params: Promise<{ 
           <input type="hidden" name="customer_id" value={c.id} />
           <input name="confirm" required autoComplete="off" placeholder="Escriba ELIMINAR" className="input" aria-label="Confirmación" />
         </ActionForm>
-      </details>
+      </section>
     </>
   );
 }

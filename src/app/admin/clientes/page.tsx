@@ -40,18 +40,19 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         ) : (
           <TableWrap>
             <table className="table">
-              <thead><tr><th>Código</th><th>Nombre</th><th>Documento</th><th>Teléfono</th><th>Cobrador</th><th className="num">Saldo</th><th>Próx. venc.</th><th>Estado</th></tr></thead>
+              <thead><tr><th>Código</th><th>Nombre</th><th>Documento</th><th>Teléfono</th><th>Cobrador</th><th className="num">Saldo</th><th>Próx. venc.</th><th>Estado</th><th></th></tr></thead>
               <tbody>
                 {data.map((c) => (
                   <tr key={c.id}>
                     <td><Link href={`/admin/clientes/${c.id}`} className="font-medium text-brand-700">{c.code}</Link></td>
-                    <td>{c.full_name}</td>
+                    <td><Link href={`/admin/clientes/${c.id}`} className="font-medium underline-offset-2 hover:underline">{c.full_name}</Link></td>
                     <td>{c.document_type} {c.document_masked}</td>
                     <td>{c.phone}</td>
                     <td>{c.collector_id ? colNames.get(c.collector_id) : <span className="text-amber-700">Sin asignar</span>}</td>
                     <td className="num">{formatCOP(c.outstanding)}</td>
                     <td>{formatDate(c.next_due_date)}</td>
                     <td><StatusBadge map={CUSTOMER_STATUS} value={c.status} /></td>
+                    <td><Link href={`/admin/clientes/${c.id}#eliminar`} className="text-sm font-medium text-red-700 underline">Eliminar</Link></td>
                   </tr>
                 ))}
               </tbody>
