@@ -381,3 +381,36 @@ describe('Pagos', () => {
     expect((await db.owner<any>('select role from public.profiles where id = $1', [id]))[0].role).toBe('customer');
   });
 });
+
+describe('Corregir fecha de inicio', () => {
+  const dues = async (loanId: string) =>
+    (await db.owner<{ d: string }>('select due_date::text d from public.loan_installments where loan_id = $1 order by number', [loanId])).map((r) => r.d);
+
+  it('un préstamo registrado ayer pasa a correr desde hoy si no tiene pagos', async () => {
+    const reference = await activeLoan(s.customerB, s.collector2, 300_000, 4, 'weekly');
+    const app = await db.rpc<string>(A(), 'create_application', {
+      p_principal: 300_000, p_installments: 4, p_frequency: 'weekly', p_start_date: isoDaysFromToday(0),
+      p_simulation_id: null, p_customer_id: s.customerB, p_message: null,
+    });
+    const loan = await db.rpc<string>(A(), 'approve_application', {
+      p_application_id: app, p_collector_id: s.collector2, p_principal: 300_000, p_installments: 4, p_frequency: 'weekly', p_start_date: isoDaysFromToday(0),
+    });
+    await db.rpc(A(), 'disburse_loan', { p_loan_id: loan, p_disbursed_on: isoDaysFromToday(-1) });
+    expect(await dues(loan)).not.toEqual(await dues(reference));
+
+    await expect(db.rpc(C2(), 'admin_change_loan_start', { p_loan_id: loan, p_start_date: isoDaysFromToday(0) })).rejects.toThrow(/FORBIDDEN/);
+    await expect(db.rpc(A(), 'admin_change_loan_start', { p_loan_id: loan, p_start_date: isoDaysFromToday(1) })).rejects.toThrow(/futura/);
+    await db.rpc(A(), 'admin_change_loan_start', { p_loan_id: loan, p_start_date: isoDaysFromToday(0) });
+
+    expect((await db.owner<any>('select start_date::text s from public.loans where id = $1', [loan]))[0].s).toBe(isoDaysFromToday(0));
+    expect(await dues(loan)).toEqual(await dues(reference));
+    expect(n((await db.owner<any>(`select count(*) c from public.audit_logs where action = 'change_loan_start' and record_id = $1`, [loan]))[0].c)).toBe(1);
+  });
+
+  it('con pagos ya no se puede mover y fuera de la función sigue bloqueado', async () => {
+    const loan = await activeLoan(s.customerB, s.collector2, 300_000, 4, 'weekly');
+    await expect(db.owner('update public.loans set start_date = start_date - 1 where id = $1', [loan])).rejects.toThrow(/IMMUTABLE/);
+    await pay(C2(), loan, 50_000);
+    await expect(db.rpc(A(), 'admin_change_loan_start', { p_loan_id: loan, p_start_date: isoDaysFromToday(-1) })).rejects.toThrow(/ya tiene pagos/);
+  });
+});

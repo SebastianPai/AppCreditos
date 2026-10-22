@@ -222,6 +222,11 @@ export async function disburseLoan(_: ActionResult, fd: FormData): Result {
   return res;
 }
 
+/** Corrige la fecha de inicio de un préstamo activo sin pagos y recalcula las cuotas. */
+export async function changeLoanStart(_: ActionResult, fd: FormData): Result {
+  return rpc('admin_change_loan_start', { p_loan_id: formString(fd, 'loan_id'), p_start_date: formOptional(fd, 'start_date') }, 'Fecha de inicio corregida. Las cuotas se recalcularon.');
+}
+
 export async function cancelLoan(_: ActionResult, fd: FormData): Result {
   return rpc('cancel_loan', { p_loan_id: formString(fd, 'loan_id'), p_reason: formString(fd, 'reason') }, 'Préstamo cancelado.');
 }

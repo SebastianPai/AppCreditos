@@ -8,7 +8,7 @@ import { formatCOP, formatDate, formatDateTime, FREQUENCY_LABEL, todayBogota, ty
 import { LOAN_STATUS, PAYMENT_METHOD } from '@/lib/labels';
 import { userDb } from '@/lib/auth';
 import { registerPayment } from '@/app/cobrador/actions';
-import { cancelLoan, disburseLoan, reversePayment } from '../../actions';
+import { cancelLoan, changeLoanStart, disburseLoan, reversePayment } from '../../actions';
 
 export default async function AdminLoanPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -90,6 +90,16 @@ export default async function AdminLoanPage({ params }: { params: Promise<{ id: 
 
       <Card title="Calendario de cuotas" className="mt-4">
         <InstallmentsTable rows={installments ?? []} />
+        {loan.status === 'active' && (payments ?? []).length === 0 && (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-sm text-brand-700">Corregir fecha de inicio (inicia {formatDate(loan.start_date)})</summary>
+            <p className="mt-2 text-sm text-slate-600">Solo mientras no tenga pagos. Las cuotas se recalculan desde la nueva fecha; los valores no cambian.</p>
+            <ActionForm action={changeLoanStart} submitLabel="Guardar nueva fecha" className="mt-2 max-w-xs space-y-2">
+              <input type="hidden" name="loan_id" value={loan.id} />
+              <div><label className="label" htmlFor="start_date">Nueva fecha de inicio</label><input id="start_date" type="date" name="start_date" required max={today} defaultValue={today} className="input" /></div>
+            </ActionForm>
+          </details>
+        )}
       </Card>
 
       {loan.status === 'active' && (
