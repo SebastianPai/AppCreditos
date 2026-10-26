@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireRole, userDb } from '@/lib/auth';
 import { friendlyError, type ActionResult } from '@/lib/errors';
-import { customerUserOfLoan, notifyUsers } from '@/lib/push';
+import { customerUserOfLoan, notifyAdmins, notifyUsers } from '@/lib/push';
 import { hashPassword, temporaryPassword } from '@/lib/password';
 import { customerSchema, firstIssue, formOptional, formPesos, formString, frequency, paymentSchema } from '@/lib/validation';
 import { z } from 'zod';
@@ -56,6 +56,22 @@ export async function requestReversal(_: ActionResult, fd: FormData): Promise<Ac
   if (error) return { ok: false, error: friendlyError(error) };
   revalidatePath('/cobrador', 'layout');
   return { ok: true, message: 'Corrección solicitada. La administración la revisará.' };
+}
+
+/** Pide a la administración eliminar un cliente o un préstamo propio. Nada se borra hasta que el administrador acepte. */
+export async function requestDeletion(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  await requireRole('collector', 'admin');
+  const db = await userDb();
+  const { error } = await db.call('request_deletion', {
+    p_kind: formString(fd, 'kind'),
+    p_target_id: formString(fd, 'target_id'),
+    p_reason: formString(fd, 'reason'),
+  });
+  if (error) return { ok: false, error: friendlyError(error) };
+  void notifyAdmins('new_application', '/admin/eliminaciones');
+  revalidatePath('/cobrador', 'layout');
+  revalidatePath('/admin', 'layout');
+  return { ok: true, message: 'Solicitud enviada. La administración debe aceptarla para eliminar.' };
 }
 
 export async function declareHandover(_: ActionResult, fd: FormData): Promise<ActionResult> {

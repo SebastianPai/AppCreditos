@@ -52,4 +52,15 @@ export const CUSTOMER_STATUS: Record<string, { label: string; tone: Tone }> = {
   blocked: { label: 'Bloqueado', tone: 'danger' },
 };
 
+export const DELETION_KIND: Record<string, string> = {
+  customer: 'Cliente',
+  loan: 'Préstamo',
+};
+
+export const DELETION_STATUS: Record<string, { label: string; tone: Tone }> = {
+  pending: { label: 'Pendiente', tone: 'warning' },
+  approved: { label: 'Eliminado', tone: 'danger' },
+  rejected: { label: 'Rechazada', tone: 'neutral' },
+};
+
 export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';

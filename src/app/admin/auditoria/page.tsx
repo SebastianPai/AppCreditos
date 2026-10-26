@@ -6,7 +6,7 @@ import { userDb } from '@/lib/auth';
 export const metadata = { title: 'Auditoría' };
 const PAGE = 50;
 
-const TABLES = ['app_settings', 'loan_policies', 'loans', 'payments', 'payment_requests', 'loan_applications', 'customers', 'profiles', 'partners', 'capital_contributions', 'expenses', 'quarterly_settlements', 'settlement_distributions', 'collector_payouts', 'cash_handovers', 'reversal_requests', 'payment_methods', 'user_permissions'];
+const TABLES = ['app_settings', 'loan_policies', 'loans', 'payments', 'payment_requests', 'loan_applications', 'customers', 'profiles', 'partners', 'capital_contributions', 'expenses', 'quarterly_settlements', 'settlement_distributions', 'collector_payouts', 'cash_handovers', 'reversal_requests', 'deletion_requests', 'payment_methods', 'user_permissions'];
 
 function diff(oldData: Record<string, unknown> | null, newData: Record<string, unknown> | null): string {
   if (!oldData) return 'Creado';

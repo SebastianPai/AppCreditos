@@ -32,11 +32,37 @@ export async function purgeTestCustomer(_: ActionResult, fd: FormData): Result {
   const { error } = await db.call('admin_purge_test_customer', {
     p_customer_id: formString(fd, 'customer_id'),
     p_confirm: formString(fd, 'confirm'),
+    p_reason: formString(fd, 'reason'),
   });
   if (error) return { ok: false, error: friendlyError(error) };
   revalidatePath('/admin', 'layout');
   revalidatePath('/cobrador', 'layout');
   redirect('/admin/clientes?eliminado=1');
+}
+
+/** Elimina un préstamo con todo lo suyo (cuotas, pagos, asientos). Queda en el registro de eliminaciones. */
+export async function purgeLoan(_: ActionResult, fd: FormData): Result {
+  await requireRole('admin');
+  const db = await userDb();
+  const { error } = await db.call('admin_purge_loan', {
+    p_loan_id: formString(fd, 'loan_id'),
+    p_confirm: formString(fd, 'confirm'),
+    p_reason: formString(fd, 'reason'),
+  });
+  if (error) return { ok: false, error: friendlyError(error) };
+  revalidatePath('/admin', 'layout');
+  revalidatePath('/cobrador', 'layout');
+  redirect('/admin/prestamos?eliminado=1');
+}
+
+/** Acepta (y ejecuta) o rechaza la eliminación pedida por un cobrador. */
+export async function decideDeletion(_: ActionResult, fd: FormData): Result {
+  const approve = formString(fd, 'decision') === 'approve';
+  return rpc('decide_deletion_request', {
+    p_request_id: formString(fd, 'request_id'),
+    p_approve: approve,
+    p_notes: formOptional(fd, 'notes'),
+  }, approve ? 'Eliminación aceptada y realizada.' : 'Solicitud rechazada. No se eliminó nada.', ['/admin', '/cobrador']);
 }
 
 export async function createCustomer(_: ActionResult, fd: FormData): Result {

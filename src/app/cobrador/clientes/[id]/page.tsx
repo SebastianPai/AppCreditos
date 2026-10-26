@@ -7,7 +7,7 @@ import { LinkButton, MoreSection, Notice } from '@/components/ui';
 import { dueStatus, formatCOP, formatDate, todayBogota } from '@/lib/finance';
 import { userDb } from '@/lib/auth';
 import { creditScore, SCORE_SQL, type ScoreInstallment } from '@/lib/score';
-import { collectorCreateAccess, registerPayment, requestReversal } from '../../actions';
+import { collectorCreateAccess, registerPayment, requestDeletion, requestReversal } from '../../actions';
 
 export default async function CollectorCustomerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ creado?: string }> }) {
   const { id } = await params;
@@ -16,12 +16,14 @@ export default async function CollectorCustomerPage({ params, searchParams }: { 
   const db = await userDb();
   const customer = await db.one('select c.*, v.document_masked from public.customers c join public.v_customers v on v.id = c.id where c.id = $1', [id]);
   if (!customer) notFound();
-  const [loans, installments, payments, scoreRows] = await Promise.all([
+  const [loans, installments, payments, scoreRows, deletionRequests] = await Promise.all([
     db.query(`select * from public.v_loan_balances where customer_id = $1 and status = 'active' order by created_at desc`, [id]),
     db.query<any>('select * from public.v_installments where customer_id = $1 order by number', [id]),
     db.query('select id, receipt_number, amount, received_on, status from public.payments where customer_id = $1 order by received_at desc limit 20', [id]),
     db.query<ScoreInstallment>(SCORE_SQL, [id]),
+    db.query<{ kind: string; loan_id: string | null }>(`select kind, loan_id from public.deletion_requests where customer_id = $1 and status = 'pending'`, [id]),
   ]);
+  const pendingDeletion = (loanId: string | null) => (deletionRequests ?? []).some((r) => (loanId ? r.loan_id === loanId : r.kind === 'customer'));
   const today = todayBogota();
   const score = creditScore(scoreRows ?? [], today);
 
@@ -72,6 +74,7 @@ export default async function CollectorCustomerPage({ params, searchParams }: { 
             <MoreSection label="Ver todas las cuotas" className="mt-3">
               <InstallmentsTable rows={rows} showSplit={false} />
             </MoreSection>
+            <DeletionRequest kind="loan" targetId={l.id} pending={pendingDeletion(l.id)} label="Pedir eliminar este préstamo" />
           </section>
         );
       })}
@@ -113,7 +116,26 @@ export default async function CollectorCustomerPage({ params, searchParams }: { 
             {!payments?.length && <li className="py-2 text-slate-500">Sin pagos.</li>}
           </ul>
         </div>
+        <div className="rounded-2xl border border-slate-200 p-4">
+          <DeletionRequest kind="customer" targetId={customer.id} pending={pendingDeletion(null)} label="Pedir eliminar este cliente" />
+        </div>
       </MoreSection>
     </>
+  );
+}
+
+/** El cobrador no elimina: envía la solicitud con el motivo y la administración decide. */
+function DeletionRequest({ kind, targetId, pending, label }: { kind: 'customer' | 'loan'; targetId: string; pending: boolean; label: string }) {
+  if (pending) return <p className="mt-3 text-xs text-amber-700">Eliminación pedida. Espera la decisión de la administración.</p>;
+  return (
+    <details className="mt-3">
+      <summary className="cursor-pointer text-xs text-red-700">{label}</summary>
+      <p className="mt-1 text-xs text-slate-500">La administración debe aceptarla; hasta entonces no se borra nada.</p>
+      <ActionForm action={requestDeletion} submitLabel="Enviar solicitud" variant="secondary" className="mt-2 space-y-2">
+        <input type="hidden" name="kind" value={kind} />
+        <input type="hidden" name="target_id" value={targetId} />
+        <input name="reason" required minLength={5} maxLength={300} className="input" placeholder="Motivo (p. ej. lo registré dos veces)" aria-label="Motivo" />
+      </ActionForm>
+    </details>
   );
 }

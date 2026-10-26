@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Badge, Card, EmptyState, LinkButton, PageHeader, StatusBadge, TableWrap } from '@/components/ui';
+import { Badge, Card, EmptyState, LinkButton, Notice, PageHeader, StatusBadge, TableWrap } from '@/components/ui';
 import { dueStatus, formatCOP, formatDate, FREQUENCY_LABEL, isIsoDate, todayBogota, type Frequency } from '@/lib/finance';
 import { LOAN_STATUS } from '@/lib/labels';
 import { userDb } from '@/lib/auth';
@@ -35,6 +35,7 @@ export default async function LoansPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <PageHeader title="Préstamos" actions={<LinkButton href="/admin/prestamos/nuevo">Nuevo préstamo</LinkButton>} />
+      {sp.eliminado === '1' && <div className="mb-4"><Notice tone="neutral">Préstamo eliminado. Quedó en el registro de Eliminaciones.</Notice></div>}
       <form className="card mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7 lg:items-end">
         <div><label className="label">Estado</label>
           <select name="estado" defaultValue={sp.estado ?? ''} className="input">

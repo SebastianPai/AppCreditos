@@ -8,7 +8,7 @@ import { formatCOP, formatDate, formatDateTime, FREQUENCY_LABEL, todayBogota, ty
 import { LOAN_STATUS, PAYMENT_METHOD } from '@/lib/labels';
 import { userDb } from '@/lib/auth';
 import { registerPayment } from '@/app/cobrador/actions';
-import { cancelLoan, changeLoanStart, disburseLoan, reversePayment } from '../../actions';
+import { cancelLoan, changeLoanStart, decideDeletion, disburseLoan, purgeLoan, reversePayment } from '../../actions';
 
 export default async function AdminLoanPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,12 +19,13 @@ export default async function AdminLoanPage({ params }: { params: Promise<{ id: 
        from public.loans l join public.customers c on c.id = l.customer_id left join public.profiles p on p.id = l.collector_id
       where l.id = $1`, [id]);
   if (!loan) notFound();
-  const [balance, installments, payments, capital, commissions] = await Promise.all([
+  const [balance, installments, payments, capital, commissions, deletionRequest] = await Promise.all([
     db.one('select * from public.v_loan_balances where id = $1', [id]),
     db.query<any>('select * from public.v_installments where loan_id = $1 order by number', [id]),
     db.query('select p.*, public.staff_name(p.received_by) as received_by_name from public.payments p where p.loan_id = $1 order by p.received_at desc', [id]),
     db.rpc('capital_summary'),
     db.query<{ amount: number }>('select amount from public.collector_commissions where loan_id = $1', [id]),
+    db.one(`select r.*, public.staff_name(r.requested_by) as requested_by_name from public.deletion_requests r where r.loan_id = $1 and r.status = 'pending'`, [id]),
   ]);
   const customer = { id: loan.customer_id as string, code: loan.customer_code as string, full_name: loan.customer_name as string };
   const collector = loan.collector_name ? { full_name: loan.collector_name as string } : null;
@@ -37,6 +38,20 @@ export default async function AdminLoanPage({ params }: { params: Promise<{ id: 
     <>
       <Link href="/admin/prestamos" className="mb-3 inline-block text-sm text-brand-700">← Préstamos</Link>
       <PageHeader title={`Préstamo ${loan.code}`} subtitle={<StatusBadge map={LOAN_STATUS} value={loan.status} />} />
+      {deletionRequest && (
+        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm">
+          <p className="font-semibold text-red-800">{deletionRequest.requested_by_name ?? 'Un cobrador'} pidió eliminar este préstamo</p>
+          <p className="mt-1 text-slate-700">Motivo: {deletionRequest.reason}</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <ActionForm action={decideDeletion} submitLabel="Aceptar y eliminar" variant="danger" confirmText="Autorizo la eliminación definitiva de este préstamo.">
+              <input type="hidden" name="request_id" value={deletionRequest.id} /><input type="hidden" name="decision" value="approve" />
+            </ActionForm>
+            <ActionForm action={decideDeletion} submitLabel="Rechazar" variant="secondary">
+              <input type="hidden" name="request_id" value={deletionRequest.id} /><input type="hidden" name="decision" value="reject" />
+            </ActionForm>
+          </div>
+        </div>
+      )}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Contrato">
           <KeyValue
@@ -144,6 +159,19 @@ export default async function AdminLoanPage({ params }: { params: Promise<{ id: 
           </table>
         </TableWrap>
       </Card>
+
+      <section id="eliminar" className="mt-6 scroll-mt-20 rounded-2xl border border-red-200 p-4">
+        <h2 className="text-sm font-semibold text-red-700">Eliminar préstamo</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          Borra este préstamo con sus cuotas, pagos, comisiones y asientos: desaparece de pantallas, informes y saldos. El cliente se
+          conserva. No se puede deshacer. Queda en el registro de Eliminaciones y en Auditoría.
+        </p>
+        <ActionForm action={purgeLoan} submitLabel="Eliminar definitivamente" variant="danger" className="mt-3 space-y-2">
+          <input type="hidden" name="loan_id" value={loan.id} />
+          <input name="reason" required minLength={5} maxLength={300} defaultValue={deletionRequest?.reason ?? ''} className="input" placeholder="Motivo (queda registrado)" aria-label="Motivo" />
+          <input name="confirm" required autoComplete="off" placeholder="Escriba ELIMINAR" className="input" aria-label="Confirmación" />
+        </ActionForm>
+      </section>
     </>
   );
 }

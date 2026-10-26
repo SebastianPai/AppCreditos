@@ -17,6 +17,7 @@ const NAV: Record<SessionProfile['role'], NavItem[]> = {
     { href: '/admin/liquidaciones', label: 'Liquidaciones', icon: 'scale' },
     { href: '/admin/reportes', label: 'Reportes', icon: 'chart' },
     { href: '/admin/usuarios', label: 'Usuarios', icon: 'key' },
+    { href: '/admin/eliminaciones', label: 'Eliminaciones', icon: 'trash' },
     { href: '/admin/configuracion', label: 'Configuración', icon: 'gear' },
     { href: '/admin/auditoria', label: 'Auditoría', icon: 'eye' },
   ],

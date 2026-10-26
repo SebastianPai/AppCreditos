@@ -209,7 +209,8 @@ describe('Eliminar cliente de prueba', () => {
 
     await expect(db.rpc(C1(), 'admin_purge_test_customer', { p_customer_id: cust, p_confirm: 'ELIMINAR' })).rejects.toThrow(/FORBIDDEN|admin/i);
     await expect(db.rpc(A(), 'admin_purge_test_customer', { p_customer_id: cust, p_confirm: 'si' })).rejects.toThrow(/ELIMINAR/);
-    await db.rpc(A(), 'admin_purge_test_customer', { p_customer_id: cust, p_confirm: 'eliminar' });
+    await expect(db.rpc(A(), 'admin_purge_test_customer', { p_customer_id: cust, p_confirm: 'ELIMINAR' })).rejects.toThrow(/motivo/);
+    await db.rpc(A(), 'admin_purge_test_customer', { p_customer_id: cust, p_confirm: 'eliminar', p_reason: 'Cliente de prueba' });
 
     expect(await db.owner('select 1 from public.customers where id = $1', [cust])).toHaveLength(0);
     expect(await db.owner('select 1 from public.loans where id = $1', [loan])).toHaveLength(0);
@@ -221,5 +222,70 @@ describe('Eliminar cliente de prueba', () => {
     expect(await db.owner(`select 1 from public.audit_logs where action = 'purge_test_customer' and record_id = $1`, [cust])).toHaveLength(1);
     // Las protecciones siguen activas fuera de la función.
     await expect(db.owner('delete from public.audit_logs')).rejects.toThrow(/IMMUTABLE/);
+  });
+});
+
+describe('Eliminar préstamos y solicitudes de eliminación', () => {
+  const newCustomer = (doc: string) => db.rpc<string>(C1(), 'create_customer', {
+    p_full_name: 'Cliente Solicitud', p_document_type: 'CC', p_document_number: doc, p_phone: '3000000000',
+    p_address: null, p_collector_id: null, p_notes: null, p_data_consent: true,
+  });
+  const newLoan = async (cust: string) => {
+    const loan = await db.rpc<string>(C1(), 'create_simple_loan', { p_customer_id: cust, p_principal: 200_000, p_installments: 4, p_frequency: 'weekly' });
+    await db.rpc(C1(), 'register_payment', {
+      p_loan_id: loan, p_amount: 60_000, p_idempotency_key: randomUUID(), p_method: 'cash', p_received_on: null, p_notes: null, p_evidence_path: null,
+    });
+    return loan;
+  };
+  const request = (id: string) => db.owner<any>('select * from public.deletion_requests where id = $1', [id]).then((r) => r[0]);
+
+  it('el administrador elimina un préstamo directamente y queda registrado', async () => {
+    const cust = await newCustomer('777000222');
+    const before = await cap();
+    const loan = await newLoan(cust);
+    await expect(db.rpc(C1(), 'admin_purge_loan', { p_loan_id: loan, p_confirm: 'ELIMINAR', p_reason: 'Prueba' })).rejects.toThrow(/FORBIDDEN|admin/i);
+    await db.rpc(A(), 'admin_purge_loan', { p_loan_id: loan, p_confirm: 'ELIMINAR', p_reason: 'Préstamo duplicado' });
+    expect(await db.owner('select 1 from public.loans where id = $1', [loan])).toHaveLength(0);
+    expect(await db.owner('select 1 from public.payments where loan_id = $1', [loan])).toHaveLength(0);
+    expect(await db.owner('select 1 from public.customers where id = $1', [cust])).toHaveLength(1);
+    expect(await cap()).toEqual(before);
+    const rec = await db.owner<any>(`select * from public.deletion_requests where loan_id = $1`, [loan]);
+    expect(rec).toHaveLength(1);
+    expect(rec[0]).toMatchObject({ kind: 'loan', status: 'approved', requested_by: s.admin, decided_by: s.admin, reason: 'Préstamo duplicado' });
+    expect(await db.owner(`select 1 from public.audit_logs where action = 'purge_loan' and record_id = $1`, [loan])).toHaveLength(1);
+  });
+
+  it('el cobrador pide eliminar un préstamo; solo se borra cuando el administrador acepta', async () => {
+    const cust = await newCustomer('777000333');
+    const loan = await newLoan(cust);
+    await expect(db.rpc(C1(), 'request_deletion', { p_kind: 'loan', p_target_id: loan, p_reason: 'x' })).rejects.toThrow(/motivo/);
+    await expect(db.rpc(user(s.collector2), 'request_deletion', { p_kind: 'loan', p_target_id: loan, p_reason: 'No es mío' })).rejects.toThrow(/FORBIDDEN|no puede/);
+    const req = await db.rpc<string>(C1(), 'request_deletion', { p_kind: 'loan', p_target_id: loan, p_reason: 'Lo registré dos veces' });
+    await expect(db.rpc(C1(), 'request_deletion', { p_kind: 'loan', p_target_id: loan, p_reason: 'Otra vez lo mismo' })).rejects.toThrow(/pendiente/);
+    await expect(db.rpc(C1(), 'decide_deletion_request', { p_request_id: req, p_approve: true, p_notes: null })).rejects.toThrow(/FORBIDDEN|admin/i);
+    expect(await db.owner('select 1 from public.loans where id = $1', [loan])).toHaveLength(1);
+
+    await db.rpc(A(), 'decide_deletion_request', { p_request_id: req, p_approve: true, p_notes: 'Ok' });
+    expect(await db.owner('select 1 from public.loans where id = $1', [loan])).toHaveLength(0);
+    expect(await request(req)).toMatchObject({ status: 'approved', requested_by: s.collector, decided_by: s.admin, decision_notes: 'Ok' });
+    expect(await db.owner('select 1 from public.deletion_requests where loan_id = $1', [loan])).toHaveLength(1);
+    await expect(db.owner('delete from public.deletion_requests where id = $1', [req])).rejects.toThrow(/IMMUTABLE/);
+  });
+
+  it('el administrador puede rechazar; al eliminar un cliente se cierran sus solicitudes', async () => {
+    const cust = await newCustomer('777000444');
+    const loan = await newLoan(cust);
+    const rejected = await db.rpc<string>(C1(), 'request_deletion', { p_kind: 'customer', p_target_id: cust, p_reason: 'Cliente de prueba' });
+    await db.rpc(A(), 'decide_deletion_request', { p_request_id: rejected, p_approve: false, p_notes: 'Es real' });
+    expect(await request(rejected)).toMatchObject({ status: 'rejected', decided_by: s.admin, decision_notes: 'Es real' });
+    expect(await db.owner('select 1 from public.customers where id = $1', [cust])).toHaveLength(1);
+
+    const loanReq = await db.rpc<string>(C1(), 'request_deletion', { p_kind: 'loan', p_target_id: loan, p_reason: 'Préstamo de prueba' });
+    const custReq = await db.rpc<string>(C1(), 'request_deletion', { p_kind: 'customer', p_target_id: cust, p_reason: 'Ahora sí es de prueba' });
+    await db.rpc(A(), 'decide_deletion_request', { p_request_id: custReq, p_approve: true, p_notes: null });
+    expect(await db.owner('select 1 from public.customers where id = $1', [cust])).toHaveLength(0);
+    expect(await request(custReq)).toMatchObject({ status: 'approved', reason: 'Ahora sí es de prueba' });
+    expect(await request(loanReq)).toMatchObject({ status: 'approved', decision_notes: 'Eliminado junto con el cliente' });
+    expect((await db.owner(`select context from public.audit_logs where action = 'purge_test_customer' and record_id = $1`, [cust]))).toHaveLength(1);
   });
 });

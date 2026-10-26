@@ -5,7 +5,7 @@ import { Card, KeyValue, LinkButton, PageHeader, StatusBadge, TableWrap } from '
 import { formatCOP, formatDate, formatDateTime } from '@/lib/finance';
 import { APPLICATION_STATUS, CUSTOMER_STATUS, LOAN_STATUS, PAYMENT_METHOD } from '@/lib/labels';
 import { userDb } from '@/lib/auth';
-import { assignCollector, createUser, purgeTestCustomer, updateCustomer } from '../../actions';
+import { assignCollector, createUser, decideDeletion, purgeTestCustomer, updateCustomer } from '../../actions';
 
 export default async function AdminCustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,12 +13,13 @@ export default async function AdminCustomerPage({ params }: { params: Promise<{ 
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const c = await db.one('select * from public.customers where id = $1', [id]);
   if (!c) notFound();
-  const [summary, loans, payments, apps, collectors] = await Promise.all([
+  const [summary, loans, payments, apps, collectors, deletionRequest] = await Promise.all([
     db.one('select outstanding, next_due_date, active_loans from public.v_customers where id = $1', [id]),
     db.query('select * from public.v_loan_balances where customer_id = $1 order by created_at desc', [id]),
     db.query('select id, receipt_number, amount, method, received_on, status from public.payments where customer_id = $1 order by received_at desc limit 50', [id]),
     db.query('select id, code, status, requested_principal, created_at from public.loan_applications where customer_id = $1 order by created_at desc', [id]),
     db.query<{ id: string; full_name: string }>(`select id, full_name from public.profiles where role = 'collector' and active order by full_name`),
+    db.one(`select r.*, public.staff_name(r.requested_by) as requested_by_name from public.deletion_requests r where r.customer_id = $1 and r.kind = 'customer' and r.status = 'pending'`, [id]),
   ]);
   const nextDue = (loans ?? []).filter((l) => l.status === 'active' && l.next_due_date).sort((a, b) => a.next_due_date.localeCompare(b.next_due_date))[0];
 
@@ -26,6 +27,20 @@ export default async function AdminCustomerPage({ params }: { params: Promise<{ 
     <>
       <Link href="/admin/clientes" className="mb-3 inline-block text-sm text-brand-700">← Clientes</Link>
       <PageHeader title={c.full_name} subtitle={<span>{c.code} · <StatusBadge map={CUSTOMER_STATUS} value={c.status} /></span>} actions={<LinkButton href={`/admin/prestamos/nuevo?cliente=${c.id}`}>Nuevo préstamo</LinkButton>} />
+      {deletionRequest && (
+        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm">
+          <p className="font-semibold text-red-800">{deletionRequest.requested_by_name ?? 'Un cobrador'} pidió eliminar este cliente</p>
+          <p className="mt-1 text-slate-700">Motivo: {deletionRequest.reason}</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <ActionForm action={decideDeletion} submitLabel="Aceptar y eliminar" variant="danger" confirmText="Autorizo la eliminación definitiva de este cliente y todo lo suyo.">
+              <input type="hidden" name="request_id" value={deletionRequest.id} /><input type="hidden" name="decision" value="approve" />
+            </ActionForm>
+            <ActionForm action={decideDeletion} submitLabel="Rechazar" variant="secondary">
+              <input type="hidden" name="request_id" value={deletionRequest.id} /><input type="hidden" name="decision" value="reject" />
+            </ActionForm>
+          </div>
+        </div>
+      )}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Ficha">
           <KeyValue
@@ -125,10 +140,11 @@ export default async function AdminCustomerPage({ params }: { params: Promise<{ 
         <h2 className="text-sm font-semibold text-red-700">Eliminar cliente de prueba</h2>
         <p className="mt-2 text-sm text-slate-600">
           Borra este cliente y todo lo suyo: acceso a la app, préstamos, cuotas, pagos y comprobantes. Desaparece de pantallas,
-          informes y saldos. No se puede deshacer. La eliminación queda anotada en Auditoría.
+          informes y saldos. No se puede deshacer. Queda en el registro de Eliminaciones y en Auditoría.
         </p>
         <ActionForm action={purgeTestCustomer} submitLabel="Eliminar definitivamente" variant="danger" className="mt-3 space-y-2">
           <input type="hidden" name="customer_id" value={c.id} />
+          <input name="reason" required minLength={5} maxLength={300} defaultValue={deletionRequest?.reason ?? ''} className="input" placeholder="Motivo (queda registrado)" aria-label="Motivo" />
           <input name="confirm" required autoComplete="off" placeholder="Escriba ELIMINAR" className="input" aria-label="Confirmación" />
         </ActionForm>
       </section>

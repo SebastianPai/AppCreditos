@@ -27,11 +27,12 @@ interface AdminDashboard {
 export default async function AdminDashboardPage({ searchParams }: { searchParams: Promise<{ cobrador?: string }> }) {
   const { cobrador } = await searchParams;
   const db = await userDb();
-  const [data, collectors, sims, compliance] = await Promise.all([
+  const [data, collectors, sims, compliance, deletions] = await Promise.all([
     db.rpc('admin_dashboard', { p_collector: uuidOrNull(cobrador) }),
     db.query<{ id: string; full_name: string }>(`select id, full_name from public.profiles where role = 'collector' and active order by full_name`),
     db.query('select id, principal, installments_count, frequency, created_at, customer_id from public.loan_simulations order by created_at desc limit 6'),
     db.one<{ value: unknown }>(`select value from public.app_settings where key = 'compliance'`),
+    db.one<{ n: number }>(`select count(*)::int as n from public.deletion_requests where status = 'pending'`),
   ]);
   if (!data) return <Notice tone="danger">No fue posible cargar el panel.</Notice>;
   const d = data as AdminDashboard;
@@ -76,6 +77,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
       <div className="mb-5 flex flex-wrap gap-2">
         <Link href="/admin/solicitudes" className="btn-secondary btn-sm">Solicitudes por revisar: <strong>{d.applications_pending}</strong></Link>
         <Link href="/admin/pagos" className="btn-secondary btn-sm">Pagos por verificar: <strong>{d.payment_requests_pending}</strong></Link>
+        {(deletions?.n ?? 0) > 0 && <Link href="/admin/eliminaciones" className="btn-secondary btn-sm text-red-700">Eliminaciones por decidir: <strong>{deletions?.n}</strong></Link>}
         <Link href="/admin/prestamos?estado=approved" className="btn-secondary btn-sm">Por desembolsar: <strong>{d.portfolio.approved_pending_disbursement}</strong></Link>
       </div>
 

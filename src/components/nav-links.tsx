@@ -27,6 +27,7 @@ const ICONS = {
   plus: 'M12 5v14M5 12h14',
   star: 'M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z',
   qr: 'M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h2v2h-2zm4 0h2v6h-6v-2',
+  trash: 'M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3',
 };
 
 function Icon({ name }: { name: NavItem['icon'] }) {
