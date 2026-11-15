@@ -1,5 +1,6 @@
 import { ActionForm } from '@/components/action-form';
 import { Notice } from '@/components/ui';
+import { InstallCallout } from '@/components/pwa';
 import { signIn } from './actions';
 
 export const metadata = { title: 'Iniciar sesión' };
@@ -26,6 +27,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </div>
         </ActionForm>
       </div>
+      <InstallCallout />
       <p className="mt-8 text-xs text-slate-500">
         Las cuentas las crea la administración. Si olvidó su contraseña, pida a un administrador que la restablezca.
       </p>

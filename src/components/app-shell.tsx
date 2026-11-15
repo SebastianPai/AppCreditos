@@ -69,7 +69,7 @@ export function AppShell({ profile, children }: { profile: SessionProfile; child
             <div className="absolute right-0 z-30 mt-2 w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
               <p className="px-2 pt-1 text-xs text-slate-500">{ROLE_LABEL[profile.role]}</p>
               {items.length > 5 && <NavLinks items={items.slice(4)} variant="menu" />}
-              <Link href="/instalar" className="block rounded-lg px-2 py-2 text-sm hover:bg-slate-50">Instalar la app</Link>
+              <Link href="/instalar" className="block rounded-lg px-2 py-2 text-sm hover:bg-slate-50">📲 Descargar la app</Link>
               <form action="/auth/signout" method="post">
                 <SignOutButton className="w-full rounded-lg px-2 py-2 text-left text-sm text-red-700 hover:bg-red-50" />
               </form>

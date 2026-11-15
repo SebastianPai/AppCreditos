@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { ServiceWorkerRegister } from '@/components/pwa';
+import { InstallBanner, ServiceWorkerRegister } from '@/components/pwa';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -30,6 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-dvh">
         {children}
         <ServiceWorkerRegister />
+        <InstallBanner />
       </body>
     </html>
   );

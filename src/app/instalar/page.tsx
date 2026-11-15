@@ -1,20 +1,23 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { getSessionProfile } from '@/lib/auth';
-import { InstallPrompt } from '@/components/pwa';
+import { InstallPrompt, ShareInstallLink } from '@/components/pwa';
 import { Card, PageHeader } from '@/components/ui';
 
 export const metadata = { title: 'Instalar la aplicación' };
 
-export default async function InstallPage() {
-  if (!(await getSessionProfile())) redirect('/login');
+// Página pública: se puede enviar el enlace por WhatsApp para que cualquiera instale la app
+// antes de iniciar sesión.
+export default function InstallPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-6">
       <Link href="/" className="mb-4 inline-block text-sm text-brand-700">← Inicio</Link>
-      <PageHeader title="Instalar Capital Control" subtitle="Instálela como una aplicación desde este enlace seguro (HTTPS). No necesita tienda de aplicaciones." />
+      <PageHeader title="Instalar Capital Control" subtitle="Descárguela en su celular con un toque. Es gratis, no necesita Play Store y se actualiza sola." />
       <div className="space-y-4">
         <Card>
           <InstallPrompt />
+        </Card>
+        <Card title="¿Instalarla en otro celular?">
+          <p className="mb-3 text-sm text-slate-600">Envíe este enlace por WhatsApp o SMS. La persona solo tiene que abrirlo en Chrome y tocar <strong>Descargar</strong>.</p>
+          <ShareInstallLink />
         </Card>
         <Card title="Android (Chrome)">
           <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-700">

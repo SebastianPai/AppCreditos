@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-// Todo requiere sesión salvo el login, el cambio inicial de contraseña y la página sin conexión.
-const PUBLIC = ['/login', '/activar', '/offline'];
+// Todo requiere sesión salvo el login, el cambio inicial de contraseña, la página sin conexión
+// y la de instalación (se comparte por WhatsApp para descargar la app antes de entrar).
+const PUBLIC = ['/login', '/activar', '/offline', '/instalar'];
 const isPublic = (path: string) => PUBLIC.some((p) => path === p || path.startsWith(`${p}/`));
 
 /**
